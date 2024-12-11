@@ -27,14 +27,13 @@ CREATE TABLE `customers` (
   `phone` varchar(20) DEFAULT NULL,
   `address` text,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 /*Data for the table `customers` */
 
 insert  into `customers`(`id`,`name`,`email`,`phone`,`address`) values 
 (1,'frankie steinlie','fs@gmail.com','08883866931','medan'),
-(3,'frankie','N/A','123','N/A'),
-(4,'frankie','N/A','123','N/A');
+(6,'Steinlie','stein@gmail.com','123456789','kediri');
 
 /*Table structure for table `facilities` */
 
@@ -46,11 +45,12 @@ CREATE TABLE `facilities` (
   `description` text,
   `price` float DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 /*Data for the table `facilities` */
 
 insert  into `facilities`(`id`,`facility_name`,`description`,`price`) values 
+(1,'Tanpa Fasilitas','Tidak ingin ada fasilitas tambahan',0),
 (3,'Personal Chef','Koki personal di kamar',5000000),
 (4,'coba','coba',123),
 (6,'bioskop','ruangan teater',400000);
@@ -70,18 +70,14 @@ CREATE TABLE `payments` (
   PRIMARY KEY (`id`),
   KEY `reservation_id` (`reservation_id`),
   CONSTRAINT `payments_ibfk_1` FOREIGN KEY (`reservation_id`) REFERENCES `reservations` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=32 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 /*Data for the table `payments` */
 
 insert  into `payments`(`id`,`reservation_id`,`payment_date`,`amount`,`payment_method`,`created_at`,`updated_at`) values 
-(1,1,'2024-12-11',35012300,'Cash','2024-12-11 10:49:44','2024-12-11 10:49:44'),
-(2,1,'2024-12-11',35012300,'Cash','2024-12-11 10:51:23','2024-12-11 10:51:23'),
-(3,1,'2024-12-11',35012300,'Cash','2024-12-11 11:09:12','2024-12-11 11:09:12'),
-(4,1,'2024-12-11',35012300,'Cash','2024-12-11 11:11:52','2024-12-11 11:11:52'),
-(5,1,'2024-12-11',35012300,'Cash','2024-12-11 11:13:41','2024-12-11 11:13:41'),
-(6,1,'2024-12-11',35012300,'Cash','2024-12-11 11:15:14','2024-12-11 11:15:14'),
-(7,1,'2024-12-11',35012300,'Cash','2024-12-11 11:17:52','2024-12-11 11:17:52');
+(8,2,'2024-12-11',200000000,'Cash','2024-12-11 18:50:29','2024-12-11 18:50:29'),
+(30,3,'2024-12-11',3000000,'Cash','2024-12-11 20:19:58','2024-12-11 20:19:58'),
+(31,4,'2024-12-11',900000,'Cash','2024-12-11 20:48:49','2024-12-11 20:48:49');
 
 /*Table structure for table `reservation_facilities` */
 
@@ -96,12 +92,14 @@ CREATE TABLE `reservation_facilities` (
   KEY `facility_id` (`facility_id`),
   CONSTRAINT `reservation_facilities_ibfk_1` FOREIGN KEY (`reservation_id`) REFERENCES `reservations` (`id`),
   CONSTRAINT `reservation_facilities_ibfk_2` FOREIGN KEY (`facility_id`) REFERENCES `facilities` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 /*Data for the table `reservation_facilities` */
 
 insert  into `reservation_facilities`(`id`,`reservation_id`,`facility_id`) values 
-(1,1,4);
+(2,2,1),
+(3,3,1),
+(4,4,6);
 
 /*Table structure for table `reservation_rooms` */
 
@@ -116,9 +114,15 @@ CREATE TABLE `reservation_rooms` (
   KEY `room_id` (`room_id`),
   CONSTRAINT `reservation_rooms_ibfk_1` FOREIGN KEY (`reservation_id`) REFERENCES `reservations` (`id`),
   CONSTRAINT `reservation_rooms_ibfk_2` FOREIGN KEY (`room_id`) REFERENCES `rooms` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 /*Data for the table `reservation_rooms` */
+
+insert  into `reservation_rooms`(`id`,`reservation_id`,`room_id`) values 
+(1,2,1),
+(2,2,2),
+(3,3,4),
+(4,4,1);
 
 /*Table structure for table `reservations` */
 
@@ -130,18 +134,20 @@ CREATE TABLE `reservations` (
   `check_in_date` date NOT NULL,
   `check_out_date` date NOT NULL,
   `total_people` int NOT NULL,
-  `total_price` decimal(10,2) NOT NULL,
+  `total_price` int NOT NULL,
   `status` enum('Pending','Confirmed','Completed','Cancelled') DEFAULT 'Pending',
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `customer_id` (`customer_id`),
   CONSTRAINT `reservations_ibfk_1` FOREIGN KEY (`customer_id`) REFERENCES `customers` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 /*Data for the table `reservations` */
 
 insert  into `reservations`(`id`,`customer_id`,`check_in_date`,`check_out_date`,`total_people`,`total_price`,`status`,`created_at`) values 
-(1,4,'2024-12-11','2024-12-13',1,350123.00,'Pending','2024-12-11 11:36:35');
+(2,1,'2024-12-11','2024-12-13',1,2000000,'Confirmed','2024-12-11 19:58:51'),
+(3,6,'2024-12-11','2024-12-11',1,3000000,'Confirmed','2024-12-11 20:19:58'),
+(4,6,'2024-12-11','2024-12-11',1,900000,'Confirmed','2024-12-11 20:48:49');
 
 /*Table structure for table `room_types` */
 
@@ -179,17 +185,19 @@ CREATE TABLE `rooms` (
   UNIQUE KEY `room_number` (`room_number`),
   KEY `room_type_id` (`room_type_id`),
   CONSTRAINT `rooms_ibfk_1` FOREIGN KEY (`room_type_id`) REFERENCES `room_types` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 /*Data for the table `rooms` */
 
 insert  into `rooms`(`id`,`room_number`,`room_type_id`,`status`) values 
 (1,'101',1,'Tersedia'),
-(2,'102',2,'Terisi'),
+(2,'102',1,'Tersedia'),
 (3,'103',3,'Tersedia'),
-(4,'104',4,'Terisi'),
+(4,'104',4,'Tersedia'),
 (5,'105',5,'Tersedia'),
-(6,'106',3,'Tersedia');
+(6,'106',3,'Tersedia'),
+(7,'111',8,'Tersedia'),
+(8,'222',5,'Tersedia');
 
 /*Table structure for table `vouchers` */
 
