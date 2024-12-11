@@ -52,11 +52,13 @@ class Ui_MainWindow(object):
         form_layout = QtWidgets.QVBoxLayout(self.form_groupbox)
         self.add_input(form_layout, "Nomor Kamar:", "input_room_number")
         
-        # Modified room type input to use database
         self.add_combobox(form_layout, "Tipe Kamar:", "input_room_type", 
-                          [rt['type_name'] for rt in self.db_manager.get_room_types()])
+                    [rt['type_name'] for rt in self.db_manager.get_room_types()])
         
-        self.add_input(form_layout, "Harga Kamar:", "input_room_price")
+        self.setup_room_type_price_connection()
+        
+        self.add_inputt(form_layout, "Harga Kamar:", "input_room_price")
+        
         self.add_combobox(form_layout, "Status Kamar:", "input_room_status", ["Tersedia", "Terisi"])
 
         button_layout = QtWidgets.QHBoxLayout()
@@ -142,6 +144,43 @@ class Ui_MainWindow(object):
         # Load rooms from database
         self.load_rooms_from_database()
 
+    def setup_room_type_price_connection(self):
+        """
+        Connect room type combobox to automatically fill room price
+        based on selected room type
+        """
+        self.input_room_type.currentTextChanged.connect(self.update_room_price)
+
+    def update_room_price(self):
+        """
+        Update room price field based on selected room type
+        """
+        selected_room_type = self.input_room_type.currentText()
+        room_types = self.db_manager.get_room_types()
+        
+        # Find price for the selected room type
+        for room_type in room_types:
+            if room_type['type_name'] == selected_room_type:
+                # Format the price with thousand separator
+                price = "{:,.0f}".format(room_type['price']).replace(',', '.')
+                self.input_room_price.setText(price)
+                break
+
+    def update_room_price(self):
+        """
+        Update room price field based on selected room type
+        """
+        selected_room_type = self.input_room_type.currentText()
+        room_types = self.db_manager.get_room_types()
+        
+        # Find price for the selected room type
+        for room_type in room_types:
+            if room_type['type_name'] == selected_room_type:
+                # Format the price with thousand separator
+                price = "{:,.0f}".format(room_type['price']).replace(',', '.')
+                self.input_room_price.setText(price)
+                break
+
     def load_rooms_from_database(self):
         # Clear existing rows
         self.room_table.setRowCount(0)
@@ -170,6 +209,19 @@ class Ui_MainWindow(object):
             self.input_room_type.setCurrentText(room_type)
             self.input_room_price.setText(self.room_table.item(row, 3).text())
             self.input_room_status.setCurrentText(self.room_table.item(row, 4).text())
+
+    def add_inputt(self, layout, label_text, input_name):
+        layout_widget = QtWidgets.QHBoxLayout()
+        label = QtWidgets.QLabel(label_text)
+        label.setFont(QtGui.QFont("Arial", 11))
+        input_field = QtWidgets.QLineEdit()
+        input_field.setFont(QtGui.QFont("Arial", 11))
+        input_field.setStyleSheet("border: 2px solid #B8D1E8; border-radius: 10px; padding: 12px; background-color: #E0E0E0;")
+        input_field.setReadOnly(True) 
+        setattr(self, input_name, input_field)
+        layout_widget.addWidget(label)
+        layout_widget.addWidget(input_field)
+        layout.addLayout(layout_widget)
 
     def add_input(self, layout, label_text, input_name):
         layout_widget = QtWidgets.QHBoxLayout()
@@ -318,7 +370,17 @@ class Ui_MainWindow(object):
             self.room_table.setRowHidden(row, not match)
 
     def back_action(self):
-        QtWidgets.QApplication.quit()  # Closes the application
+        """
+        Close current window and return to main dashboard
+        """
+        from inicr import Ui_MainWindow as menu
+        
+        # Import here to avoid circular import
+        self.window = QtWidgets.QMainWindow()
+        self.ui = menu()
+        self.ui.setupUi(self.window)
+        QtWidgets.QApplication.activeWindow().close()
+        self.window.showMaximized()
 
 if __name__ == "__main__":
     import sys

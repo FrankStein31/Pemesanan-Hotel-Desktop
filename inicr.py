@@ -141,6 +141,7 @@ class Ui_MainWindow(object):
         self.window = QtWidgets.QMainWindow()
         self.ui = CrudWindow()
         self.ui.setupUi(self.window)
+        QtWidgets.QApplication.activeWindow().close()
         self.window.showMaximized()  # Full screen for Stok Kamar
 
     def show_kamar_window(self):
@@ -148,6 +149,7 @@ class Ui_MainWindow(object):
         self.window = QtWidgets.QMainWindow()
         self.ui = KmrWindow()  # Create the KmrWindow instance
         self.ui.setupUi(self.window)
+        QtWidgets.QApplication.activeWindow().close()
         self.window.showMaximized()  # Full screen for Kamar management
 
     def show_fasilitas_crud(self):
@@ -155,6 +157,7 @@ class Ui_MainWindow(object):
         self.window = QtWidgets.QMainWindow()
         self.ui = FasilitasWindow()  # Create the FasilitasWindow instance
         self.ui.setupUi(self.window)
+        QtWidgets.QApplication.activeWindow().close()
         self.window.showMaximized()  # Full screen for Fasilitas window
 
     def show_pelanggan_crud(self):
@@ -162,6 +165,7 @@ class Ui_MainWindow(object):
         self.window = QtWidgets.QMainWindow()
         self.ui = DpWindow()  # Create the DpWindow instance (from dp.py)
         self.ui.setupUi(self.window)
+        QtWidgets.QApplication.activeWindow().close()
         self.window.showMaximized()  # Full screen for Data Pelanggan window
 
     # def go_back(self):

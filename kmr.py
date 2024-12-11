@@ -266,7 +266,17 @@ class Ui_MainWindow(object):
         self.room_desc_input.clear()
 
     def back_action(self):
-        QtWidgets.QApplication.quit()
+        """
+        Close current window and return to main dashboard
+        """
+        from inicr import Ui_MainWindow as menu
+        
+        # Import here to avoid circular import
+        self.window = QtWidgets.QMainWindow()
+        self.ui = menu()
+        self.ui.setupUi(self.window)
+        QtWidgets.QApplication.activeWindow().close()
+        self.window.showMaximized()
 
 def main():
     app = QtWidgets.QApplication(sys.argv)

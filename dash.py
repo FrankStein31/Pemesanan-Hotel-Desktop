@@ -82,21 +82,21 @@ class Ui_MainWindow(object):
         self.overlay_layout.addWidget(self.label)
 
         # ComboBox
-        self.comboBox = QtWidgets.QComboBox(self.overlay_widget)
-        self.comboBox.setStyleSheet("""
-            background-color: rgba(173, 216, 230, 0.8);
-            color: #333;
-            font-size: 16px;
-            padding: 12px;
-            border-radius: 20px;
-        """)
-        self.comboBox.addItems([
-            "ROOM AND SUITES", "Standard Room",
-            "Executive Room", "Deluxe Room",
-            "Suite Room", "Presidential Room"
-        ])
-        self.comboBox.currentIndexChanged.connect(self.show_rooms)
-        self.overlay_layout.addWidget(self.comboBox)
+        # self.comboBox = QtWidgets.QComboBox(self.overlay_widget)
+        # self.comboBox.setStyleSheet("""
+        #     background-color: rgba(173, 216, 230, 0.8);
+        #     color: #333;
+        #     font-size: 16px;
+        #     padding: 12px;
+        #     border-radius: 20px;
+        # """)
+        # self.comboBox.addItems([
+        #     "ROOM AND SUITES", "Standard Room",
+        #     "Executive Room", "Deluxe Room",
+        #     "Suite Room", "Presidential Room"
+        # ])
+        # self.comboBox.currentIndexChanged.connect(self.show_rooms)
+        # self.overlay_layout.addWidget(self.comboBox)
 
         # Button Layout
         self.button_layout = QtWidgets.QHBoxLayout()

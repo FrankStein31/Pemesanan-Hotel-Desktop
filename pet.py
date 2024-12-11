@@ -86,24 +86,24 @@ class Ui_MainWindow(object):
         self.overlay_layout.addWidget(self.label)
 
         # ComboBox untuk memilih jenis kamar
-        self.comboBox = QtWidgets.QComboBox(self.overlay_widget)
-        self.comboBox.setStyleSheet("""
-            background-color: #ffffff;
-            color: #333333;
-            font-size: 16px;
-            padding: 8px;
-            border-radius: 10px;
-            font-family: 'Lora', serif;
-            border: 2px solid #888888;
-        """)
-        self.comboBox.addItem("ROOM AND SUITES")
-        self.comboBox.addItem("Standart Room")
-        self.comboBox.addItem("Executive Room")
-        self.comboBox.addItem("Deluxe Room")
-        self.comboBox.addItem("Suite Room")
-        self.comboBox.addItem("Presidential Room")
-        self.comboBox.currentIndexChanged.connect(self.show_rooms)
-        self.overlay_layout.addWidget(self.comboBox)
+        # self.comboBox = QtWidgets.QComboBox(self.overlay_widget)
+        # self.comboBox.setStyleSheet("""
+        #     background-color: #ffffff;
+        #     color: #333333;
+        #     font-size: 16px;
+        #     padding: 8px;
+        #     border-radius: 10px;
+        #     font-family: 'Lora', serif;
+        #     border: 2px solid #888888;
+        # """)
+        # self.comboBox.addItem("ROOM AND SUITES")
+        # self.comboBox.addItem("Standart Room")
+        # self.comboBox.addItem("Executive Room")
+        # self.comboBox.addItem("Deluxe Room")
+        # self.comboBox.addItem("Suite Room")
+        # self.comboBox.addItem("Presidential Room")
+        # self.comboBox.currentIndexChanged.connect(self.show_rooms)
+        # self.overlay_layout.addWidget(self.comboBox)
 
         # Button layout untuk tombol-tombol lainnya
         self.button_layout = QtWidgets.QHBoxLayout()

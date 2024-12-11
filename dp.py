@@ -133,10 +133,23 @@ class Ui_MainWindow(object):
         self.deleteButton.clicked.connect(self.deleteRow)
         self.addButton.clicked.connect(self.addCustomer)
         self.editButton.clicked.connect(self.editCustomer)
-        self.backButton.clicked.connect(MainWindow.close)
+        self.backButton.clicked.connect(self.back_action)
 
         # Load data from database
         self.loadCustomerData()
+
+    def back_action(self):
+        """
+        Close current window and return to main dashboard
+        """
+        from inicr import Ui_MainWindow as menu
+        
+        # Import here to avoid circular import
+        self.window = QtWidgets.QMainWindow()
+        self.ui = menu()
+        self.ui.setupUi(self.window)
+        QtWidgets.QApplication.activeWindow().close()
+        self.window.showMaximized()
 
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate

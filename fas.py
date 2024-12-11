@@ -466,7 +466,17 @@ class Ui_MainWindow(object):
     #     self.update_table()
 
     def go_back(self):
-        QtWidgets.QApplication.quit()
+        """
+        Close current window and return to main dashboard
+        """
+        from inicr import Ui_MainWindow as menu
+        
+        # Import here to avoid circular import
+        self.window = QtWidgets.QMainWindow()
+        self.ui = menu()
+        self.ui.setupUi(self.window)
+        QtWidgets.QApplication.activeWindow().close()
+        self.window.showMaximized()
 
 if __name__ == "__main__":
     import sys
