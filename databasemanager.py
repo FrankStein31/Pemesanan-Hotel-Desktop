@@ -37,6 +37,8 @@ class DatabaseManager:
     # Room Type CRUD Operations
     def add_room_type(self, type_name, description, price):
         try:
+            # Ensure price is converted to integer
+            price = int(price)
             query = "INSERT INTO room_types (type_name, description, price) VALUES (%s, %s, %s)"
             self.cursor.execute(query, (type_name, description, price))
             self.connection.commit()
@@ -147,22 +149,71 @@ class DatabaseManager:
             self.connection.rollback()
             QMessageBox.critical(None, "Database Error", f"Failed to add facility: {str(e)}")
             return None
+        
+    def update_reservation_status(self, reservation_id, status):
+        """
+        Update the status of a specific reservation
+        
+        Parameters:
+        - reservation_id (int): ID of the reservation to update
+        - status (str): New status for the reservation
+        
+        Returns:
+        - bool: True if update successful, False otherwise
+        """
+        try:
+            # Validate that the status is a valid enum value
+            valid_statuses = ['Pending', 'Confirmed', 'Completed', 'Cancelled', 'Paid']
+            if status not in valid_statuses:
+                raise ValueError(f"Invalid status. Must be one of {valid_statuses}")
 
+            # SQL query to update reservation status
+            query = """
+            UPDATE reservations 
+            SET status = %s 
+            WHERE id = %s
+            """
+            
+            # Execute the update
+            self.cursor.execute(query, (status, reservation_id))
+            
+            # Commit the transaction
+            self.connection.commit()
+            
+            # Log the status update
+            print(f"Reservation {reservation_id} status updated to {status}")
+            
+            return True
+        
+        except Error as e:
+            # Rollback the transaction in case of error
+            self.connection.rollback()
+            
+            # Show error message
+            QMessageBox.critical(None, "Database Error", 
+                                f"Failed to update reservation status: {str(e)}")
+            
+            return False
+        except ValueError as ve:
+            # Handle invalid status
+            QMessageBox.warning(None, "Invalid Status", str(ve))
+            return False
+        
     def get_facilities(self):
         try:
             query = "SELECT * FROM facilities"
             self.cursor.execute(query)
             facilities = self.cursor.fetchall()
             
-            # Format price back to string with dot separators
+            # Ensure price is an integer without converting to float
             for facility in facilities:
-                facility['price'] = f"{facility['price']:,}".replace(',', '.')
+                facility['price'] = int(facility['price'])
             
             return facilities
         except Error as e:
             QMessageBox.critical(None, "Database Error", f"Failed to retrieve facilities: {str(e)}")
             return []
-
+        
     def update_facility(self, facility_id, facility_name, description, price):
         try:
             # Convert price to an integer, removing any formatting
@@ -262,26 +313,21 @@ class DatabaseManager:
     # Reservation CRUD Operations
     def create_reservation(self, customer_id, check_in_date, check_out_date, total_people, total_price, room_ids, facility_ids, voucher_code=None):
         try:
-            # Start a transaction
+            # Pastikan tidak ada transaksi yang sedang berlangsung
+            if self.connection.is_connected():
+                if self.connection.in_transaction:
+                    self.connection.rollback()  # Batalkan transaksi sebelumnya jika ada
+
+            # Mulai transaksi baru
             self.connection.start_transaction()
 
-            # Check voucher if provided
-            discount_percentage = 0
-            if voucher_code:
-                voucher_query = "SELECT discount_percentage FROM vouchers WHERE CODE = %s AND is_active = TRUE AND CURRENT_DATE BETWEEN valid_from AND valid_to"
-                self.cursor.execute(voucher_query, (voucher_code,))
-                voucher_result = self.cursor.fetchone()
-                if voucher_result:
-                    discount_percentage = voucher_result['discount_percentage']
-                    total_price *= (1 - discount_percentage / 100)
-
-            # Insert reservation
+            # Insert reservation dengan total harga sebagai integer
             reservation_query = """
             INSERT INTO reservations 
             (customer_id, check_in_date, check_out_date, total_people, total_price, status) 
             VALUES (%s, %s, %s, %s, %s, 'Pending')
             """
-            self.cursor.execute(reservation_query, (customer_id, check_in_date, check_out_date, total_people, total_price))
+            self.cursor.execute(reservation_query, (customer_id, check_in_date, check_out_date, total_people, int(total_price)))
             reservation_id = self.cursor.lastrowid
 
             # Insert reservation rooms
@@ -305,12 +351,12 @@ class DatabaseManager:
 
     def get_available_rooms(self, check_in_date, check_out_date, room_type_id=None):
         try:
-            # Query to find rooms not reserved during the specified period
+            # Query to find rooms that are available and not reserved during a specific period
             query = """
             SELECT rooms.id, rooms.room_number, room_types.type_name, room_types.price
             FROM rooms
             JOIN room_types ON rooms.room_type_id = room_types.id
-            WHERE rooms.id NOT IN (
+            WHERE rooms.status = 'Tersedia' AND rooms.id NOT IN (
                 SELECT DISTINCT reservation_rooms.room_id
                 FROM reservation_rooms
                 JOIN reservations ON reservation_rooms.reservation_id = reservations.id
@@ -319,7 +365,7 @@ class DatabaseManager:
                     (%s BETWEEN check_in_date AND check_out_date) OR
                     (check_in_date BETWEEN %s AND %s)
                 )
-                AND status != 'Cancelled'
+                AND reservations.status != 'Cancelled'
             )
             """
             params = [check_in_date, check_out_date, check_in_date, check_out_date]
@@ -330,10 +376,55 @@ class DatabaseManager:
                 params.append(room_type_id)
 
             self.cursor.execute(query, params)
-            return self.cursor.fetchall()
+            available_rooms = self.cursor.fetchall()
+
+            # If no rooms are available, show all rooms of the type
+            if not available_rooms and room_type_id:
+                query = """
+                SELECT rooms.id, rooms.room_number, room_types.type_name, room_types.price
+                FROM rooms
+                JOIN room_types ON rooms.room_type_id = room_types.id
+                WHERE rooms.room_type_id = %s AND rooms.status = 'Tersedia'
+                """
+                self.cursor.execute(query, (room_type_id,))
+                available_rooms = self.cursor.fetchall()
+
+            return available_rooms
         except Error as e:
             QMessageBox.critical(None, "Room Availability Error", str(e))
             return []
+
+    def update_room_status_after_checkout(self):
+        try:
+            # Query to update room status to 'Tersedia' for rooms in completed reservations
+            query = """
+            UPDATE rooms r
+            JOIN reservation_rooms rr ON r.id = rr.room_id
+            JOIN reservations res ON rr.reservation_id = res.id
+            SET r.status = 'Tersedia'
+            WHERE res.check_out_date < CURRENT_DATE 
+            AND res.status = 'Completed'
+            """
+            
+            self.cursor.execute(query)
+            self.connection.commit()
+            
+            print("Room statuses updated successfully")
+        except Error as e:
+            self.connection.rollback()
+            QMessageBox.critical(None, "Room Status Update Error", str(e))
+
+    def ensure_transaction_closed(self):
+        """
+        Memastikan transaksi ditutup dengan benar
+        Panggil method ini sebelum operasi database yang memerlukan transaksi baru
+        """
+        try:
+            if self.connection.is_connected() and self.connection.in_transaction:
+                print("Warning: Closing an ongoing transaction")
+                self.connection.rollback()
+        except Exception as e:
+            print(f"Error closing transaction: {e}")
 
     def get_reservation_details(self, reservation_id):
         try:

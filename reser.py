@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
-        self.db_manager = DatabaseManager()  # Initialize database manager early
+        self.db_manager = DatabaseManager() 
         
         MainWindow.setObjectName("MainWindow")
         MainWindow.resize(800, 600)
@@ -66,8 +66,10 @@ class Ui_MainWindow(object):
         self.scroll_layout.setVerticalSpacing(15)
 
         # Tambahkan form
-        self.name_input = self.create_line_edit("Nama Lengkap")
-        self.add_form_field("Nama Lengkap:", self.name_input)
+        # self.name_input = self.create_line_edit("Nama Lengkap")
+        # self.add_form_field("Nama Lengkap:", self.name_input)
+        self.customer_combo = self.create_customer_combo()
+        self.add_form_field("Nama Pelanggan:", self.customer_combo)
         
         self.ktp_input = self.create_line_edit("Nomor KTP")
         self.add_form_field("No KTP:", self.ktp_input)
@@ -158,35 +160,102 @@ class Ui_MainWindow(object):
     def add_room_type_field(self):
         # Clear any previously added room type fields to avoid duplicates
         for widget in self.room_widgets:
-            widget[0].clear()
-            widget[1].clear()
+            widget[0].clear()  # Room Type Combo
+            widget[1].clear()  # Room Quantity Input
+            widget[2].clear()  # Room Number List
 
         # Get available room types from the database
         room_types = self.db_manager.get_room_types()
 
-        # Create a new room type combobox and input field for room quantity
+        # Create room type combobox
         room_type_combobox = QtWidgets.QComboBox()
         for room_type in room_types:
-            room_type_text = f"{room_type['type_name']} - Rp {room_type['price']:,}"
+            room_type_text = f"{room_type['type_name']} - Rp {int(room_type['price'])}"
             room_type_combobox.addItem(room_type_text, room_type['id'])
+        
+        # Connect room type selection to update available rooms
+        room_type_combobox.currentIndexChanged.connect(self.update_available_rooms)
 
+        # Room Quantity Input
         room_quantity_input = self.create_line_edit("Jumlah Kamar")
         room_quantity_input.setValidator(QtGui.QIntValidator(0, 10))
 
-        # Save references to the room widgets
-        self.room_widgets.append((room_type_combobox, room_quantity_input))
+        # Room Number List (QListWidget for multi-selection)
+        room_number_list = QtWidgets.QListWidget()
+        room_number_list.setSelectionMode(QtWidgets.QAbstractItemView.MultiSelection)
 
-        # Create a widget to hold the room type combobox and quantity input
+        # Save references to the room widgets
+        self.room_widgets.append((room_type_combobox, room_quantity_input, room_number_list))
+
+        # Create a widget to hold the room type, quantity, and room number selection
         room_layout_item = QtWidgets.QWidget()
         room_layout_item.setLayout(QtWidgets.QVBoxLayout())
+        
         room_layout_item.layout().addWidget(QtWidgets.QLabel("Jenis Kamar:"))
         room_layout_item.layout().addWidget(room_type_combobox)
+        
         room_layout_item.layout().addWidget(QtWidgets.QLabel("Jumlah Kamar:"))
         room_layout_item.layout().addWidget(room_quantity_input)
+        
+        room_layout_item.layout().addWidget(QtWidgets.QLabel("Nomor Kamar:"))
+        room_layout_item.layout().addWidget(room_number_list)
 
         # Add the room layout item to the room layout
         self.room_layout.addWidget(room_layout_item)
 
+    def update_available_rooms(self):
+        # Get the currently selected room type and dates
+        room_type_combobox, room_quantity_input, room_number_list = self.room_widgets[0]
+        room_type_id = room_type_combobox.currentData()
+        
+        # Get check-in and check-out dates
+        check_in_date = self.check_in_date.date().toString("yyyy-MM-dd")
+        check_out_date = self.check_out_date.date().toString("yyyy-MM-dd")
+
+        # Clear existing items in room number list
+        room_number_list.clear()
+
+        # Fetch available rooms for this type and period
+        available_rooms = self.db_manager.get_available_rooms(
+            check_in_date, 
+            check_out_date, 
+            room_type_id
+        )
+
+        # Add event listener for room quantity validation
+        def validate_room_selection():
+            try:
+                room_quantity = int(room_quantity_input.text())
+                selected_rooms = room_number_list.selectedItems()
+                
+                if len(selected_rooms) > room_quantity:
+                    QtWidgets.QMessageBox.warning(None, "Peringatan", 
+                        f"Anda hanya boleh memilih maksimal {room_quantity} kamar.")
+                    # Unselect extra rooms
+                    while len(room_number_list.selectedItems()) > room_quantity:
+                        room_number_list.selectedItems()[-1].setSelected(False)
+            except ValueError:
+                pass
+
+        room_number_list.itemSelectionChanged.connect(validate_room_selection)
+
+        # If no available rooms
+        if not available_rooms:
+            # Get all rooms of this type
+            room_type_name = room_type_combobox.currentText().split(" - ")[0]
+            
+            # Inform user that all rooms are booked
+            room_number_list.addItem(f"Maaf, semua kamar {room_type_name} penuh")
+            room_quantity_input.setEnabled(False)
+        else:
+            # Populate room number list with available rooms
+            for room in available_rooms:
+                item = QtWidgets.QListWidgetItem(str(room['room_number']))
+                item.setData(QtCore.Qt.UserRole, room['id'])
+                room_number_list.addItem(item)
+            
+            # Re-enable quantity input
+            room_quantity_input.setEnabled(True)
 
     def calculate_total_price(self):
         total_price = 0
@@ -197,25 +266,40 @@ class Ui_MainWindow(object):
         except ValueError:
             num_people = 1  # Default 1 orang jika input tidak valid
 
+        # Hitung jumlah hari menginap
+        check_in_date = self.check_in_date.date().toPyDate()
+        check_out_date = self.check_out_date.date().toPyDate()
+        num_days = (check_out_date - check_in_date).days
+        if num_days < 1:
+            num_days = 1  # Minimal 1 hari
+
         # Mengambil harga fasilitas
         fasilitas_text = self.fasilitas_combo.currentText()
-        facility_price = int(float(fasilitas_text.split(" - Rp ")[1].replace(".", "").replace(",", "")))
-        total_price += facility_price * num_people  # Fasilitas dihitung per orang
+        facility_price = int(fasilitas_text.split(" - Rp ")[1].replace(".", "").replace(",", ""))
+        total_price += facility_price * num_people * num_days  # Fasilitas dihitung per orang per hari
 
         # Mengambil harga kamar dan jumlah kamar
-        for room_type_combobox, room_quantity_input in self.room_widgets:
+        for room_type_combobox, room_quantity_input, room_number_combo in self.room_widgets:
+            # Pastikan ada kamar yang dipilih
+            if room_number_combo.count() == 0:
+                continue
+
             room_type_text = room_type_combobox.currentText()
-            room_price = int(float(room_type_text.split(" - Rp ")[1].replace(".", "").replace(",", "")))
+            room_price = int(room_type_text.split(" - Rp ")[1].replace(".", "").replace(",", ""))
             
             try:
                 room_quantity = int(room_quantity_input.text())
                 if room_quantity > 0:  # Pastikan jumlah kamar lebih besar dari 0
-                    total_price += room_price * room_quantity * num_people  # Harga kamar per orang
+                    # Harga kamar per kamar per orang per hari
+                    total_price += room_price * room_quantity * num_people * num_days
             except ValueError:
                 pass  # Jika input tidak valid, abaikan
 
+        # Format total harga dengan pemisah ribuan
+        formatted_total_price = "{:,.0f}".format(total_price).replace(",", ".")
+
         # Update total price label
-        self.total_price_label.setText(f"Total Harga: Rp {total_price:,}")
+        self.total_price_label.setText(f"Total Harga: Rp {formatted_total_price}")
         return total_price
 
     def go_to_bayar(self):
@@ -247,70 +331,102 @@ class Ui_MainWindow(object):
         except Exception as e:
             QtWidgets.QMessageBox.critical(None, "Error", str(e))
         
-    def create_reservation(self):
-        # Validate inputs
-        if not self.name_input.text():
-            raise ValueError("Nama harus diisi")
+    def create_customer_combo(self):
+        # Dynamically populate customers from database
+        customers = self.db_manager.get_customers()
+        customer_combo = QtWidgets.QComboBox()
         
+        # Add a default "Select Customer" option
+        customer_combo.addItem("Pilih Pelanggan", None)
+        
+        for customer in customers:
+            customer_text = f"{customer['name']} - {customer['phone']}"
+            customer_combo.addItem(customer_text, customer['id'])
+        
+        return customer_combo
+        
+    def ensure_transaction_closed(self):
+        """
+        Memastikan transaksi ditutup dengan benar
+        Panggil method ini sebelum operasi database yang memerlukan transaksi baru
+        """
+        try:
+            if self.connection.is_connected() and self.connection.in_transaction:
+                print("Warning: Closing an ongoing transaction")
+                self.connection.rollback()
+        except Exception as e:
+            print(f"Error closing transaction: {e}")
+
+    def create_reservation(self):
+        self.ensure_transaction_closed()
+        # Validate inputs
         if not self.ktp_input.text():
             raise ValueError("Nomor KTP harus diisi")
 
+        # Get selected customer details
+        customer_index = self.customer_combo.currentIndex()
+        if customer_index <= 0:  # Index 0 is the "Pilih Pelanggan" placeholder
+            raise ValueError("Harap pilih pelanggan")
+
+        # Get full customer details
+        customer_text = self.customer_combo.currentText()
+        customer_id = self.customer_combo.currentData()
+        
+        # Find the original customer details from the database
+        customers = self.db_manager.get_customers()
+        selected_customer = next((customer for customer in customers if customer['id'] == customer_id), None)
+        
+        if not selected_customer:
+            raise ValueError("Data pelanggan tidak ditemukan")
+
+        # Extract phone and email from selected customer
+        phone = selected_customer.get('phone', 'N/A')
+        email = selected_customer.get('email', 'N/A')
+
+        room_type_combobox, room_quantity_input, room_number_list = self.room_widgets[0]
+
+        try:
+            room_quantity = int(room_quantity_input.text())
+        except ValueError:
+            raise ValueError("Jumlah kamar tidak valid")
+
+        selected_room_ids = [item.data(QtCore.Qt.UserRole) for item in room_number_list.selectedItems()]
+        if len(selected_room_ids) != room_quantity:
+            raise ValueError(f"Harap pilih {room_quantity} kamar")
+
         # Collect form data
-        name = self.name_input.text()
         ktp = self.ktp_input.text()
         check_in_date = self.check_in_date.date().toString("yyyy-MM-dd")
         check_out_date = self.check_out_date.date().toString("yyyy-MM-dd")
-        
-        # Facility selection
         facility_id = self.fasilitas_combo.currentData()
-        
-        # Room selection
-        room_type_combobox, room_quantity_input = self.room_widgets[0]
-        room_type_id = room_type_combobox.currentData()
-        room_quantity = int(room_quantity_input.text())
-        
-        # Get available rooms
-        available_rooms = self.db_manager.get_available_rooms(
-            check_in_date, 
-            check_out_date, 
-            room_type_id
-        )
-        
-        # Select rooms
-        room_ids = [room['id'] for room in available_rooms[:room_quantity]]
-        
-        # People count
+
         try:
             total_people = int(self.people_count_input.text())
         except ValueError:
             total_people = 1
-        
+
         # Calculate total price
         total_price = self.calculate_total_price()
-        
-        # Voucher code (optional)
-        # voucher_code = self.voucher_input.text().strip()
-        
-        # Add customer
-        customer_id = self.db_manager.add_customer(
-            name, 
-            "N/A", 
-            ktp, 
-            "N/A"
-        )
-        
+
+        # Add customer with retrieved details
+        # customer_id = self.db_manager.add_customer(
+        #     name=selected_customer['name'],
+        #     address=selected_customer.get('address', 'N/A'),
+        #     phone=phone,
+        #     email=email
+        # )
+
         # Create reservation
         reservation_id = self.db_manager.create_reservation(
-            customer_id, 
-            check_in_date, 
-            check_out_date, 
-            total_people, 
-            total_price, 
-            room_ids, 
-            [facility_id]
-            # voucher_code
+            customer_id=customer_id,
+            check_in_date=check_in_date,
+            check_out_date=check_out_date,
+            total_people=total_people,
+            total_price=total_price,
+            room_ids=selected_room_ids,
+            facility_ids=[facility_id] if facility_id else []
         )
-        
+
         return reservation_id
 
     def add_form_field(self, label_text, widget):

@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import QMessageBox
 from datetime import datetime, timedelta
 
 class Ui_MainWindow(object):
-    def setupUi(self, MainWindow):
+    def setupUi(self, MainWindow, reservation_id):
         MainWindow.setObjectName("MainWindow")
         MainWindow.resize(600, 900)  # Optional resize before maximizing
         self.centralwidget = QtWidgets.QWidget(MainWindow)
@@ -121,8 +121,10 @@ class Ui_MainWindow(object):
         MainWindow.setCentralWidget(self.centralwidget)
         self.retranslateUi(MainWindow)
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
-
-        self.load_latest_payment_details()
+        
+        self.reservation_id = reservation_id
+        # self.load_latest_payment_details()
+        self.load_latest_payment_details(self.reservation_id)
 
     def add_detail(self, label_text, value_text):
         label = QtWidgets.QLabel(label_text)
@@ -136,30 +138,51 @@ class Ui_MainWindow(object):
         MainWindow.setWindowTitle(_translate("MainWindow", "Invoice Pembayaran"))
 
     def go_back(self):
-        """Action for 'Back' button"""
-        print("Kembali ke menu utama")
-        subprocess.Popen(["python", "pet.py"])  # Open pet.py
-        QtWidgets.QApplication.quit()  # Close current window
+        try:
+            # Tutup jendela saat ini terlebih dahulu
+            MainWindow = self.centralwidget.window()
+            MainWindow.close()
+            
+            # Buka jendela pembayaran
+            subprocess.Popen(["python", "bayar.py"])
+        except Exception as e:
+            QMessageBox.critical(None, "Error", f"Gagal kembali ke halaman pembayaran: {e}")
 
     def finish_action(self):
-        """Action for 'Finish' button"""
-        print("Selesai - Anda telah selesai dengan pembayaran.")
-        subprocess.Popen(["python", "logout.py"])  # Open logout.py
-        QtWidgets.QApplication.quit()  # Close current window
+        try:
+            # Tutup jendela saat ini terlebih dahulu
+            MainWindow = self.centralwidget.window()
+            MainWindow.close()
+            
+            # Buka halaman logout
+            subprocess.Popen(["python", "logout.py"])
+        except Exception as e:
+            QMessageBox.critical(None, "Error", f"Gagal menyelesaikan proses: {e}")
 
-    def load_latest_payment_details(self):
+    def load_latest_payment_details(self, reservation_id=None):
         # Use DatabaseManager to get the latest payment details
         db_manager = DatabaseManager()
         
         try:
-            # First, get the latest payment
-            query = """
-            SELECT reservation_id, payment_date, amount, payment_method
-            FROM payments
-            ORDER BY payment_date DESC
-            LIMIT 1
-            """
-            db_manager.cursor.execute(query)
+            # Modifikasi query untuk mendapatkan reservasi spesifik jika reservation_id diberikan
+            if reservation_id:
+                query = """
+                SELECT reservation_id, payment_date, amount, payment_method
+                FROM payments
+                WHERE reservation_id = %s
+                ORDER BY payment_date DESC
+                LIMIT 1
+                """
+                db_manager.cursor.execute(query, (reservation_id,))
+            else:
+                query = """
+                SELECT reservation_id, payment_date, amount, payment_method
+                FROM payments
+                ORDER BY payment_date DESC
+                LIMIT 1
+                """
+                db_manager.cursor.execute(query)
+            
             payment_details = db_manager.cursor.fetchone()
             
             if payment_details:
@@ -191,6 +214,8 @@ class Ui_MainWindow(object):
         facility_details = ", ".join([f"{facility['facility_name']}" for facility in details.get('facilities', [])])
         
         # Prepare details for form
+        amount = details.get('amount', 0)
+
         invoice_details = [
             ("Nama Pelanggan:", details.get('customer_name', 'N/A')),
             ("Nomor Pemesanan:", str(details.get('id', 'N/A'))),
@@ -203,7 +228,7 @@ class Ui_MainWindow(object):
             ("Jumlah Orang Menginap:", str(details.get('total_people', 0))),
             ("Fasilitas:", facility_details),
             ("Metode Pembayaran:", details.get('payment_method', 'N/A')),
-            ("Total Pembayaran:", f"Rp {details.get('amount', 0):,.2f}")
+            ("Total Pembayaran:", f"Rp {int(amount):,}")
         ]
         
         # Clear existing details
@@ -219,7 +244,11 @@ if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
     MainWindow = QtWidgets.QMainWindow()
     ui = Ui_MainWindow()
-    ui.setupUi(MainWindow)
+    
+    # Use a default reservation ID for testing, or use the first argument if provided
+    reservation_id = sys.argv[1] if len(sys.argv) > 1 else 1  # Default to 1 if no argument
+    
+    ui.setupUi(MainWindow, reservation_id)
     
     # Open the window maximized (full-screen size)
     MainWindow.showMaximized()

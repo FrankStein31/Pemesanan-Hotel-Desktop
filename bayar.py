@@ -1,6 +1,9 @@
 from PyQt5 import QtCore, QtGui, QtWidgets
 import sys
 import subprocess
+import schedule
+import threading
+import time
 from databasemanager import DatabaseManager
 from invo import Ui_MainWindow as InvoiceWindow
 
@@ -114,7 +117,7 @@ class Ui_MainWindow(object):
         self.total_input = QtWidgets.QLineEdit()
         self.total_input.setReadOnly(True)  # Make read-only to prevent manual editing
         self.total_input.setPlaceholderText("Total akan ditampilkan otomatis")
-        self.total_input.setValidator(QtGui.QDoubleValidator(0, 999999999, 2))
+        self.total_input.setValidator(QtGui.QIntValidator(0, 999999999))
         self.total_input.setStyleSheet("""
             padding: 12px; 
             font-size: 14px; 
@@ -126,58 +129,6 @@ class Ui_MainWindow(object):
         """)
         self.layout.addWidget(self.total_label)
         self.layout.addWidget(self.total_input)
-
-        # Voucher Code
-        # self.voucher_label = QtWidgets.QLabel("Voucher Code (Optional):")
-        # self.voucher_label.setStyleSheet("""
-        #     color: #ffffff;
-        #     font-family: 'Roboto', sans-serif;
-        #     font-size: 16px;
-        # """)
-        # self.voucher_input = QtWidgets.QLineEdit()
-        # self.voucher_input.setPlaceholderText("Masukkan kode voucher (jika ada)")
-        # self.voucher_input.setStyleSheet("""
-        #     padding: 12px; 
-        #     font-size: 14px; 
-        #     border: 2px solid #ff77ff; 
-        #     border-radius: 12px; 
-        #     background-color: #2e2e3e; 
-        #     color: #ffffff;
-        #     font-family: 'Roboto', sans-serif;
-        # """)
-        # self.layout.addWidget(self.voucher_label)
-        # self.layout.addWidget(self.voucher_input)
-
-        # Verify Voucher Button
-        # self.verify_voucher_button = QtWidgets.QPushButton("Verify Voucher")
-        # self.verify_voucher_button.setStyleSheet("""
-        #     background-color: #4285f4; 
-        #     color: white; 
-        #     font-weight: bold; 
-        #     padding: 10px; 
-        #     border-radius: 10px;
-        #     font-size: 14px;
-        #     text-shadow: 1px 1px 3px #000000;
-        # """)
-        # self.verify_voucher_button.clicked.connect(self.verify_voucher)
-        # self.layout.addWidget(self.verify_voucher_button)
-
-        # Discounted Total Label
-        # self.discounted_total_label = QtWidgets.QLabel("Total (Rp):")
-        # self.discounted_total_label.setStyleSheet("""
-        #     color: #ffffff;
-        #     font-family: 'Roboto', sans-serif;
-        #     font-size: 16px;
-        # """)
-        # self.discounted_total_value = QtWidgets.QLabel("Rp 0")
-        # self.discounted_total_value.setStyleSheet("""
-        #     color: #ff77ff;
-        #     font-family: 'Roboto', sans-serif;
-        #     font-size: 16px;
-        #     font-weight: bold;
-        # """)
-        # self.layout.addWidget(self.discounted_total_label)
-        # self.layout.addWidget(self.discounted_total_value)
 
         # Add a stretch to push the buttons to the bottom
         self.layout.addStretch(1)
@@ -233,20 +184,53 @@ class Ui_MainWindow(object):
         self.reservation_combo.currentIndexChanged.connect(self.load_reservation_total)
 
         # Populate customers
+        self.start_room_status_scheduler()
         self.populate_customers()
+
+    def update_rooms(self):
+        """Update room status after checkout times"""
+        try:
+            self.db_manager.update_room_status_after_checkout()
+            print("Room status updated successfully")
+        except Exception as e:
+            print(f"Error updating room status: {e}")
+
+    def start_room_status_scheduler(self):
+        """Start a background thread for room status scheduling"""
+        def schedule_thread():
+            schedule.every().day.at("00:00").do(self.update_rooms)
+            while True:
+                schedule.run_pending()
+                time.sleep(1)
+
+        # Start scheduler in a background thread
+        scheduler_thread = threading.Thread(target=schedule_thread, daemon=True)
+        scheduler_thread.start()
 
     def populate_customers(self):
         # Clear existing items
         self.customer_combo.clear()
         self.customer_combo.addItem("Pilih Pelanggan")
         
-        # Get customers from database
-        customers = self.db_manager.get_customers()
+        # Get customers with active reservations from database
+        query = """
+        SELECT DISTINCT c.id, c.name, c.email, c.phone
+        FROM customers c
+        JOIN reservations r ON c.id = r.customer_id
+        WHERE r.status != 'Cancelled'
+        ORDER BY c.name
+        """
+        
+        # Execute the query
+        self.db_manager.cursor.execute(query)
+        customers = self.db_manager.cursor.fetchall()
         
         # Populate customer dropdown
         for customer in customers:
+            # Fallback to phone or some other unique identifier if email not available
+            identifier = customer.get('email', customer.get('phone', 'No Contact'))
             self.customer_combo.addItem(
-                f"{customer['name']} - {customer['email']}", 
+                f"{customer['name']} - {identifier}", 
                 customer['id']
             )
 
@@ -260,24 +244,39 @@ class Ui_MainWindow(object):
         if customer_index > 0:
             customer_id = self.customer_combo.currentData()
             
-            # Query reservations for this customer (you might need to add this method to DatabaseManager)
             try:
+                # Fetch reservations for the customer with status not cancelled
                 query = """
-                SELECT id, check_in_date, check_out_date, total_price 
-                FROM reservations 
-                WHERE customer_id = %s AND status != 'Cancelled'
+                SELECT r.id, r.check_in_date, r.check_out_date, r.total_price, r.status, 
+                    c.name AS customer_name
+                FROM reservations r
+                JOIN customers c ON r.customer_id = c.id
+                WHERE r.customer_id = %s AND r.status != 'Cancelled'
+                ORDER BY r.check_in_date DESC
                 """
+                
+                # Using the database manager's cursor to execute the query
                 self.db_manager.cursor.execute(query, (customer_id,))
                 reservations = self.db_manager.cursor.fetchall()
-                
+                    
                 # Populate reservation dropdown
                 for reservation in reservations:
                     display_text = (
                         f"Reservasi {reservation['id']} - "
                         f"Check-in: {reservation['check_in_date']} - "
-                        f"Total: Rp {reservation['total_price']:,.2f}"
+                        f"Status: {reservation['status']} - "
+                        f"Total: Rp {reservation['total_price']:,}"
                     )
                     self.reservation_combo.addItem(display_text, reservation['id'])
+                
+                # If no reservations found, show a message
+                if len(reservations) == 0:
+                    QtWidgets.QMessageBox.information(
+                        None, 
+                        "Informasi", 
+                        "Pelanggan tidak memiliki reservasi aktif."
+                    )
+            
             except Exception as e:
                 QtWidgets.QMessageBox.warning(None, "Error", f"Gagal memuat reservasi: {str(e)}")
 
@@ -288,43 +287,14 @@ class Ui_MainWindow(object):
             reservation_id = self.reservation_combo.currentData()
             
             # Get reservation details
-            reservation = self.db_manager.get_reservation_details(reservation_id)
-            
-            if reservation:
-                # Set total in the input field
-                self.total_input.setText(f"{reservation['total_price']:,.2f}")
-
-    # def verify_voucher(self):
-    #     voucher_code = self.voucher_input.text()
-    #     if not voucher_code:
-    #         QtWidgets.QMessageBox.warning(None, "Peringatan", "Masukkan kode voucher!")
-    #         return
-
-    #     # Use database method to verify voucher
-    #     voucher = self.db_manager.verify_voucher(voucher_code)
-    #     if voucher:
-    #         # Get total price from input
-    #         try:
-    #             total_price = float(self.total_input.text().replace('.', '').replace(',', ''))
-    #             discount_percentage = voucher['discount_percentage']
+            try:
+                reservation = self.db_manager.get_reservation_details(reservation_id)
                 
-    #             # Calculate discounted total
-    #             discount_amount = total_price * (discount_percentage / 100)
-    #             discounted_total = total_price - discount_amount
-
-    #             QtWidgets.QMessageBox.information(
-    #                 None, 
-    #                 "Voucher Valid", 
-    #                 f"Voucher berhasil diverifikasi!\nDiskon: {discount_percentage}%\nPotongan: Rp {discount_amount:.2f}"
-    #             )
-
-    #             # Update total with discount
-    #             self.discounted_total_value.setText(f"Rp {discounted_total:,.2f}")
-    #             self.total_input.setText(f"{discounted_total:,.2f}")
-    #         except ValueError:
-    #             QtWidgets.QMessageBox.warning(None, "Error", "Pilih reservasi terlebih dahulu!")
-    #     else:
-    #         QtWidgets.QMessageBox.warning(None, "Voucher Invalid", "Voucher tidak valid atau sudah kadaluarsa!")
+                if reservation:
+                    # Set total in the input field
+                    self.total_input.setText(f"{int(reservation['total_price']):,}")
+            except Exception as e:
+                QtWidgets.QMessageBox.warning(None, "Error", f"Gagal memuat detail reservasi: {str(e)}")
 
     def confirm_payment(self):
         # Validasi input
@@ -337,13 +307,13 @@ class Ui_MainWindow(object):
         try:
             # Ambil semua detail pembayaran
             customer_name = self.customer_combo.currentText().split(' - ')[0]
-            reservation_id = self.reservation_combo.currentData()  # ID reservasi
+            reservation_id = self.reservation_combo.currentData()
             payment_method = self.payment_combo.currentText()
-            payment_date = QtCore.QDate.currentDate().toString("yyyy-MM-dd")  # Ambil tanggal hari ini
-            total = float(self.total_input.text().replace('.', '').replace(',', ''))
+            payment_date = QtCore.QDate.currentDate().toString("yyyy-MM-dd")
+            total = int(self.total_input.text().replace('.', '').replace(',', ''))
 
             # Validasi total pembayaran
-            if total < 10000:
+            if total < 1:
                 QtWidgets.QMessageBox.warning(
                     None, "Peringatan", 
                     "Total pembayaran harus minimal Rp 10,000!"
@@ -359,8 +329,11 @@ class Ui_MainWindow(object):
             )
 
             if success:
+                # Update reservation status
+                self.db_manager.update_reservation_status(reservation_id, 'Confirmed')
+
                 # Open Invoice Window
-                self.open_invoice_window()
+                self.open_invoice_window(reservation_id)
 
                 QtWidgets.QMessageBox.information(
                     None, "Sukses", 
@@ -375,19 +348,22 @@ class Ui_MainWindow(object):
             QtWidgets.QMessageBox.warning(
                 None, "Error", f"Terjadi kesalahan: {str(e)}"
             )
-
-    def open_invoice_window(self):
+            
+    def open_invoice_window(self, reservation_id):
         # Buat jendela invoice baru
         self.invoice_window = QtWidgets.QMainWindow()
         ui_invoice = InvoiceWindow()
-        ui_invoice.setupUi(self.invoice_window)
-        
-        # Tampilkan jendela invoice dalam mode maksimum
-        self.invoice_window.showMaximized()
+        ui_invoice.setupUi(self.invoice_window, reservation_id)
+        QtWidgets.QApplication.activeWindow().close()
+        # Tampilkan jendela invoice
+        self.invoice_window.show()  # Ganti dari showMaximized()
 
     def go_back(self):
-        subprocess.Popen(["python", "reser.py"])  # Open reser.py when "Kembali" is clicked
-        
+        # Open previous reservation window
+        subprocess.Popen(["python", "reser.py"])
+        # Close current window
+        QtWidgets.QApplication.activeWindow().close()
+
 def main():
     app = QtWidgets.QApplication(sys.argv)
     MainWindow = QtWidgets.QMainWindow()
