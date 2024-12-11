@@ -303,6 +303,32 @@ class Ui_MainWindow(object):
         QtWidgets.QApplication.activeWindow().close()
         self.window.showMaximized()
 
+    # def goBack(self, role):
+    #     """
+    #     Close current window and navigate to the appropriate dashboard
+    #     based on user role.
+    #     :param role: User role, either 'Admin' or 'Petugas'
+    #     """
+    #     if role == "Admin":
+    #         from dash import Ui_MainWindow as DashboardWindow
+    #         self.window = QtWidgets.QMainWindow()
+    #         self.ui = DashboardWindow()
+    #     elif role == "Petugas":
+    #         from pet import Ui_MainWindow as PetugasWindow
+    #         self.window = QtWidgets.QMainWindow()
+    #         self.ui = PetugasWindow()
+    #     else:
+    #         QtWidgets.QMessageBox.warning(
+    #             None, "Error", f"Role '{role}' is not recognized."
+    #         )
+    #         return
+
+    #     # Setup the UI and close current window
+    #     self.ui.setupUi(self.window)
+    #     QtWidgets.QApplication.activeWindow().close()
+    #     self.window.showMaximized()
+
+
 if __name__ == "__main__":
     import sys
 

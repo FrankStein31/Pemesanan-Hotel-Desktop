@@ -155,7 +155,7 @@ class Ui_MainWindow(object):
             # Insert data in order: ID, Type Name, Price, Description
             self.tableWidget.setItem(row_position, 0, QtWidgets.QTableWidgetItem(str(room_type['id'])))
             self.tableWidget.setItem(row_position, 1, QtWidgets.QTableWidgetItem(room_type['type_name']))
-            self.tableWidget.setItem(row_position, 2, QtWidgets.QTableWidgetItem(f"Rp {room_type['price']:,.0f}"))
+            self.tableWidget.setItem(row_position, 2, QtWidgets.QTableWidgetItem(f"Rp {room_type['price']}"))
             self.tableWidget.setItem(row_position, 3, QtWidgets.QTableWidgetItem(room_type['description']))
 
     def fill_form_from_selection(self):
@@ -179,7 +179,7 @@ class Ui_MainWindow(object):
         if room_name and room_price and room_desc:
             try:
                 # Convert price to numeric
-                price = float(room_price.replace(',', ''))
+                price = int(room_price.replace(',', ''))
                 
                 # Add to database
                 new_id = self.db_manager.add_room_type(room_name, room_desc, price)
@@ -203,7 +203,7 @@ class Ui_MainWindow(object):
         if room_id and room_name and room_price and room_desc:
             try:
                 # Convert price to numeric
-                price = float(room_price.replace(',', ''))
+                price = int(room_price.replace(',', ''))
                 
                 # Update in database
                 success = self.db_manager.update_room_type(int(room_id), room_name, room_desc, price)

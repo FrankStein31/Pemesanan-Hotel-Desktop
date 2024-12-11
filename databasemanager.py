@@ -93,20 +93,6 @@ class DatabaseManager:
             QMessageBox.critical(None, "Database Error", str(e))
             return None
 
-    # def get_rooms(self):
-    #     try:
-    #         query = """
-    #         SELECT rooms.id, rooms.room_number, room_types.type_name, 
-    #                room_types.price, rooms.status, room_types.description
-    #         FROM rooms 
-    #         JOIN room_types ON rooms.room_type_id = room_types.id
-    #         """
-    #         self.cursor.execute(query)
-    #         return self.cursor.fetchall()
-    #     except Error as e:
-    #         QMessageBox.critical(None, "Database Error", str(e))
-    #         return []
-        
     def get_rooms(self):
         try:
             query = """
@@ -272,3 +258,173 @@ class DatabaseManager:
             self.connection.rollback()
             QMessageBox.critical(None, "Database Error", str(e))
             return False
+        
+    # Reservation CRUD Operations
+    def create_reservation(self, customer_id, check_in_date, check_out_date, total_people, total_price, room_ids, facility_ids, voucher_code=None):
+        try:
+            # Start a transaction
+            self.connection.start_transaction()
+
+            # Check voucher if provided
+            discount_percentage = 0
+            if voucher_code:
+                voucher_query = "SELECT discount_percentage FROM vouchers WHERE CODE = %s AND is_active = TRUE AND CURRENT_DATE BETWEEN valid_from AND valid_to"
+                self.cursor.execute(voucher_query, (voucher_code,))
+                voucher_result = self.cursor.fetchone()
+                if voucher_result:
+                    discount_percentage = voucher_result['discount_percentage']
+                    total_price *= (1 - discount_percentage / 100)
+
+            # Insert reservation
+            reservation_query = """
+            INSERT INTO reservations 
+            (customer_id, check_in_date, check_out_date, total_people, total_price, status) 
+            VALUES (%s, %s, %s, %s, %s, 'Pending')
+            """
+            self.cursor.execute(reservation_query, (customer_id, check_in_date, check_out_date, total_people, total_price))
+            reservation_id = self.cursor.lastrowid
+
+            # Insert reservation rooms
+            room_query = "INSERT INTO reservation_rooms (reservation_id, room_id) VALUES (%s, %s)"
+            for room_id in room_ids:
+                self.cursor.execute(room_query, (reservation_id, room_id))
+
+            # Insert reservation facilities
+            facility_query = "INSERT INTO reservation_facilities (reservation_id, facility_id) VALUES (%s, %s)"
+            for facility_id in facility_ids:
+                self.cursor.execute(facility_query, (reservation_id, facility_id))
+
+            # Commit the transaction
+            self.connection.commit()
+            return reservation_id
+        except Error as e:
+            # Rollback in case of error
+            self.connection.rollback()
+            QMessageBox.critical(None, "Reservation Error", str(e))
+            return None
+
+    def get_available_rooms(self, check_in_date, check_out_date, room_type_id=None):
+        try:
+            # Query to find rooms not reserved during the specified period
+            query = """
+            SELECT rooms.id, rooms.room_number, room_types.type_name, room_types.price
+            FROM rooms
+            JOIN room_types ON rooms.room_type_id = room_types.id
+            WHERE rooms.id NOT IN (
+                SELECT DISTINCT reservation_rooms.room_id
+                FROM reservation_rooms
+                JOIN reservations ON reservation_rooms.reservation_id = reservations.id
+                WHERE (
+                    (%s BETWEEN check_in_date AND check_out_date) OR
+                    (%s BETWEEN check_in_date AND check_out_date) OR
+                    (check_in_date BETWEEN %s AND %s)
+                )
+                AND status != 'Cancelled'
+            )
+            """
+            params = [check_in_date, check_out_date, check_in_date, check_out_date]
+
+            # Add room type filter if specified
+            if room_type_id:
+                query += " AND rooms.room_type_id = %s"
+                params.append(room_type_id)
+
+            self.cursor.execute(query, params)
+            return self.cursor.fetchall()
+        except Error as e:
+            QMessageBox.critical(None, "Room Availability Error", str(e))
+            return []
+
+    def get_reservation_details(self, reservation_id):
+        try:
+            # Get reservation details with customer info
+            reservation_query = """
+            SELECT r.*, c.name AS customer_name, c.email, c.phone
+            FROM reservations r
+            JOIN customers c ON r.customer_id = c.id
+            WHERE r.id = %s
+            """
+            self.cursor.execute(reservation_query, (reservation_id,))
+            reservation = self.cursor.fetchone()
+
+            # Get reserved rooms
+            rooms_query = """
+            SELECT rr.room_id, rm.room_number, rt.type_name, rt.price
+            FROM reservation_rooms rr
+            JOIN rooms rm ON rr.room_id = rm.id
+            JOIN room_types rt ON rm.room_type_id = rt.id
+            WHERE rr.reservation_id = %s
+            """
+            self.cursor.execute(rooms_query, (reservation_id,))
+            reservation['rooms'] = self.cursor.fetchall()
+
+            # Get reserved facilities
+            facilities_query = """
+            SELECT rf.facility_id, f.facility_name, f.price
+            FROM reservation_facilities rf
+            JOIN facilities f ON rf.facility_id = f.id
+            WHERE rf.reservation_id = %s
+            """
+            self.cursor.execute(facilities_query, (reservation_id,))
+            reservation['facilities'] = self.cursor.fetchall()
+
+            return reservation
+        except Error as e:
+            QMessageBox.critical(None, "Reservation Details Error", str(e))
+            return None
+
+    def cancel_reservation(self, reservation_id):
+        try:
+            query = "UPDATE reservations SET status = 'Cancelled' WHERE id = %s"
+            self.cursor.execute(query, (reservation_id,))
+            self.connection.commit()
+            return True
+        except Error as e:
+            self.connection.rollback()
+            QMessageBox.critical(None, "Reservation Cancellation Error", str(e))
+            return False
+
+    def verify_voucher(self, voucher_code):
+        try:
+            query = """
+            SELECT * FROM vouchers 
+            WHERE CODE = %s 
+            AND is_active = TRUE 
+            AND CURRENT_DATE BETWEEN valid_from AND valid_to
+            """
+            self.cursor.execute(query, (voucher_code,))
+            return self.cursor.fetchone()
+        except Error as e:
+            QMessageBox.critical(None, "Voucher Verification Error", str(e))
+            return None
+        
+    def check_voucher_discount(self, voucher_code):
+        try:
+            # Query untuk memeriksa voucher di database
+            query = "SELECT discount_percentage FROM vouchers WHERE code = ? AND is_active = 1"
+            self.cursor.execute(query, (voucher_code,))
+            result = self.cursor.fetchone()
+
+            if result:
+                return result[0]  # Kembalikan persentase diskon
+            else:
+                return 0  # Voucher tidak valid
+        except Exception as e:
+            print(f"Error checking voucher: {e}")
+            return 0
+        
+    def save_payment(self, reservation_id, payment_date, amount, payment_method):
+        try:
+            query = """
+                INSERT INTO payments (reservation_id, payment_date, amount, payment_method)
+                VALUES (%s, %s, %s, %s)
+            """
+            values = (reservation_id, payment_date, amount, payment_method)
+            self.cursor.execute(query, values)
+            self.connection.commit()
+            return True
+        except Exception as e:
+            print(f"Error saving payment: {e}")
+            self.connection.rollback()
+            return False
+

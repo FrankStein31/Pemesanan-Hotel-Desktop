@@ -1,14 +1,17 @@
 from PyQt5 import QtCore, QtGui, QtWidgets
 import sys
 import subprocess
-import random
+from databasemanager import DatabaseManager
+from datetime import datetime, timedelta
 
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
+        self.db_manager = DatabaseManager()  # Initialize database manager early
+        
         MainWindow.setObjectName("MainWindow")
         MainWindow.resize(800, 600)
 
-        # Set theme
+        # Set theme (keeping the existing styling)
         MainWindow.setStyleSheet("""
             QWidget {
                 background-color: #d4f1f4;
@@ -63,32 +66,46 @@ class Ui_MainWindow(object):
         self.scroll_layout.setVerticalSpacing(15)
 
         # Tambahkan form
-        self.add_form_field("Nama Lengkap:", QtWidgets.QLineEdit())
-        self.add_form_field("No KTP:", QtWidgets.QLineEdit())
-        self.add_form_field("Tanggal Check-in:", self.create_date_edit())
-        self.add_form_field("Tanggal Check-out:", self.create_date_edit())
+        self.name_input = self.create_line_edit("Nama Lengkap")
+        self.add_form_field("Nama Lengkap:", self.name_input)
+        
+        self.ktp_input = self.create_line_edit("Nomor KTP")
+        self.add_form_field("No KTP:", self.ktp_input)
+        
+        self.check_in_date = self.create_date_edit()
+        self.add_form_field("Tanggal Check-in:", self.check_in_date)
+        
+        self.check_out_date = self.create_date_edit()
+        self.add_form_field("Tanggal Check-out:", self.check_out_date)
 
-        # Fasilitas
-        self.fasilitas_combo = self.create_combo(["Spa - Rp 200,000", "Game Center - Rp 150,000",
-                                                  "Bioskop - Rp 200,000", "Kolam Renang - Rp 100,000",
-                                                  "Gym - Rp 75,000"])
+        # Fasilitas - Dynamically populated from database
+        self.fasilitas_combo = self.create_facility_combo()
         self.add_form_field("Fasilitas:", self.fasilitas_combo)
 
-        # Jenis Kelamin
-        self.add_form_field("Jenis Kelamin:", self.create_combo(["Laki-Laki", "Perempuan"]))
-        self.add_form_field("Jumlah Orang:", QtWidgets.QLineEdit())
+        # Gender 
+        self.gender_combo = self.create_combo(["Laki-Laki", "Perempuan"])
+        self.add_form_field("Jenis Kelamin:", self.gender_combo)
 
-        # Layout untuk jenis kamar
+        # People Count
+        self.people_count_input = self.create_line_edit("Jumlah Orang")
+        self.people_count_input.setValidator(QtGui.QIntValidator(1, 10))
+        self.add_form_field("Jumlah Orang:", self.people_count_input)
+
+        # Optional Voucher
+        # self.voucher_input = self.create_line_edit("Kode Voucher (Optional)")
+        # self.add_form_field("Kode Voucher:", self.voucher_input)
+
+        # Room Type Layout
         self.room_layout = QtWidgets.QVBoxLayout()
-        self.room_widgets = []  # Menyimpan referensi untuk jenis kamar dan jumlah kamar
+        self.room_widgets = []
         self.add_room_type_field()
 
-        # Tambahkan tombol untuk hitung total harga
+        # Calculate Price Button
         self.calculate_price_button = QtWidgets.QPushButton("Hitung Total Harga")
         self.calculate_price_button.clicked.connect(self.calculate_total_price)
         self.room_layout.addWidget(self.calculate_price_button)
 
-        # Label total harga
+        # Total Price Label
         self.total_price_label = QtWidgets.QLabel("Total Harga: Rp 0")
         self.room_layout.addWidget(self.total_price_label)
 
@@ -108,6 +125,184 @@ class Ui_MainWindow(object):
 
         self.titleLayout.addLayout(self.buttonLayout)
         MainWindow.setCentralWidget(self.centralwidget)
+
+    def create_line_edit(self, placeholder):
+        line_edit = QtWidgets.QLineEdit()
+        line_edit.setPlaceholderText(placeholder)
+        return line_edit
+
+    def create_facility_combo(self):
+        # Dynamically populate facilities from database
+        facilities = self.db_manager.get_facilities()
+        facility_combo = QtWidgets.QComboBox()
+        
+        for facility in facilities:
+            facility_text = f"{facility['facility_name']} - Rp {facility['price']}"
+            facility_combo.addItem(facility_text, facility['id'])
+        
+        return facility_combo
+
+    def add_room_type_field(self):
+        # Clear any previously added room type fields to avoid duplicates
+        for widget in self.room_widgets:
+            widget[0].clear()
+            widget[1].clear()
+
+        # Get available room types from the database
+        room_types = self.db_manager.get_room_types()
+
+        # Create a new room type combobox and input field for room quantity
+        room_type_combobox = QtWidgets.QComboBox()
+        for room_type in room_types:
+            room_type_text = f"{room_type['type_name']} - Rp {room_type['price']:,}"
+            room_type_combobox.addItem(room_type_text, room_type['id'])
+
+        room_quantity_input = self.create_line_edit("Jumlah Kamar")
+        room_quantity_input.setValidator(QtGui.QIntValidator(0, 10))
+
+        # Save references to the room widgets
+        self.room_widgets.append((room_type_combobox, room_quantity_input))
+
+        # Create a widget to hold the room type combobox and quantity input
+        room_layout_item = QtWidgets.QWidget()
+        room_layout_item.setLayout(QtWidgets.QVBoxLayout())
+        room_layout_item.layout().addWidget(QtWidgets.QLabel("Jenis Kamar:"))
+        room_layout_item.layout().addWidget(room_type_combobox)
+        room_layout_item.layout().addWidget(QtWidgets.QLabel("Jumlah Kamar:"))
+        room_layout_item.layout().addWidget(room_quantity_input)
+
+        # Add the room layout item to the room layout
+        self.room_layout.addWidget(room_layout_item)
+
+
+    def calculate_total_price(self):
+        total_price = 0
+
+        # Mengambil jumlah orang
+        try:
+            num_people = int(self.people_count_input.text())
+        except ValueError:
+            num_people = 1  # Default 1 orang jika input tidak valid
+
+        # Mengambil harga fasilitas
+        fasilitas_text = self.fasilitas_combo.currentText()
+        facility_price = int(float(fasilitas_text.split(" - Rp ")[1].replace(".", "").replace(",", "")))
+        total_price += facility_price * num_people  # Fasilitas dihitung per orang
+
+        # Mengambil harga kamar dan jumlah kamar
+        for room_type_combobox, room_quantity_input in self.room_widgets:
+            room_type_text = room_type_combobox.currentText()
+            room_price = int(float(room_type_text.split(" - Rp ")[1].replace(".", "").replace(",", "")))
+            
+            try:
+                room_quantity = int(room_quantity_input.text())
+                if room_quantity > 0:  # Pastikan jumlah kamar lebih besar dari 0
+                    total_price += room_price * room_quantity * num_people  # Harga kamar per orang
+            except ValueError:
+                pass  # Jika input tidak valid, abaikan
+
+        # Update total price label
+        self.total_price_label.setText(f"Total Harga: Rp {total_price:,}")
+        return total_price
+
+
+    def go_back_to_pet(self):
+        subprocess.Popen(["python", "pet.py"])
+
+    def go_to_bayar(self):
+        try:
+            # Create reservation
+            reservation_id = self.create_reservation()
+            
+            if reservation_id:
+                # Get reservation details
+                reservation = self.db_manager.get_reservation_details(reservation_id)
+                
+                # Show success message with reservation details
+                message = f"""
+                Reservasi berhasil!
+                Nomor Pesanan: {reservation_id}
+                Nama: {reservation['customer_name']}
+                Check-in: {reservation['check_in_date']}
+                Check-out: {reservation['check_out_date']}
+                Total Orang: {reservation['total_people']}
+                Total Harga: Rp {reservation['total_price']:,.2f}
+                """
+                
+                QtWidgets.QMessageBox.information(None, "Reservasi Sukses", message)
+                
+                # Proceed to payment
+                subprocess.Popen(["python", "bayar.py"])
+            else:
+                QtWidgets.QMessageBox.warning(None, "Reservasi Gagal", "Gagal membuat reservasi. Silakan coba lagi.")
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(None, "Error", str(e))
+        
+    def create_reservation(self):
+        # Validate inputs
+        if not self.name_input.text():
+            raise ValueError("Nama harus diisi")
+        
+        if not self.ktp_input.text():
+            raise ValueError("Nomor KTP harus diisi")
+
+        # Collect form data
+        name = self.name_input.text()
+        ktp = self.ktp_input.text()
+        check_in_date = self.check_in_date.date().toString("yyyy-MM-dd")
+        check_out_date = self.check_out_date.date().toString("yyyy-MM-dd")
+        
+        # Facility selection
+        facility_id = self.fasilitas_combo.currentData()
+        
+        # Room selection
+        room_type_combobox, room_quantity_input = self.room_widgets[0]
+        room_type_id = room_type_combobox.currentData()
+        room_quantity = int(room_quantity_input.text())
+        
+        # Get available rooms
+        available_rooms = self.db_manager.get_available_rooms(
+            check_in_date, 
+            check_out_date, 
+            room_type_id
+        )
+        
+        # Select rooms
+        room_ids = [room['id'] for room in available_rooms[:room_quantity]]
+        
+        # People count
+        try:
+            total_people = int(self.people_count_input.text())
+        except ValueError:
+            total_people = 1
+        
+        # Calculate total price
+        total_price = self.calculate_total_price()
+        
+        # Voucher code (optional)
+        # voucher_code = self.voucher_input.text().strip()
+        
+        # Add customer
+        customer_id = self.db_manager.add_customer(
+            name, 
+            "N/A", 
+            ktp, 
+            "N/A"
+        )
+        
+        # Create reservation
+        reservation_id = self.db_manager.create_reservation(
+            customer_id, 
+            check_in_date, 
+            check_out_date, 
+            total_people, 
+            total_price, 
+            room_ids, 
+            [facility_id]
+            # voucher_code
+        )
+        
+        return reservation_id
 
     def add_form_field(self, label_text, widget):
         label = QtWidgets.QLabel(label_text)
@@ -129,74 +324,6 @@ class Ui_MainWindow(object):
         button = QtWidgets.QPushButton(text)
         button.setFixedHeight(40)
         return button
-
-    def add_room_type_field(self):
-        self.room_prices = {
-            "Standard Room": 500000,
-            "Executive Room": 1500000,
-            "Deluxe Room": 2500000,
-            "Suite Room": 3000000,
-            "Presidential Room": 5000000
-        }
-
-        room_type_combobox = self.create_combo([f"{name} - Rp {price:,}" for name, price in self.room_prices.items()])
-        room_quantity_input = QtWidgets.QLineEdit()
-        room_quantity_input.setPlaceholderText("Jumlah Kamar")
-        room_quantity_input.setValidator(QtGui.QIntValidator(0, 100))
-
-        # Simpan referensi
-        self.room_widgets.append((room_type_combobox, room_quantity_input))
-
-        # Tambahkan ke layout
-        room_layout_item = QtWidgets.QWidget()
-        room_layout_item.setLayout(QtWidgets.QVBoxLayout())
-        room_layout_item.layout().addWidget(QtWidgets.QLabel("Jenis Kamar:"))
-        room_layout_item.layout().addWidget(room_type_combobox)
-        room_layout_item.layout().addWidget(QtWidgets.QLabel("Jumlah Kamar:"))
-        room_layout_item.layout().addWidget(room_quantity_input)
-
-        self.room_layout.addWidget(room_layout_item)
-
-    def calculate_total_price(self):
-        total_price = 0
-
-        # Mengambil jumlah orang
-        try:
-            num_people = int(self.scroll_layout.itemAt(5).widget().text())  # Mengambil input Jumlah Orang
-        except ValueError:
-            num_people = 1  # Default 1 orang jika input tidak valid
-
-        # Mengambil harga fasilitas
-        fasilitas_text = self.fasilitas_combo.currentText()
-        fasilitas_price = int(fasilitas_text.split(" - Rp ")[1].replace(",", ""))
-        total_price += fasilitas_price * num_people  # Fasilitas dihitung per orang
-
-        # Mengambil harga kamar dan jumlah kamar
-        for room_type_combobox, room_quantity_input in self.room_widgets:
-            room_type_text = room_type_combobox.currentText()
-            room_type = room_type_text.split(" - ")[0]
-            try:
-                room_quantity = int(room_quantity_input.text())
-                total_price += self.room_prices[room_type] * room_quantity * num_people  # Harga kamar per orang
-            except ValueError:
-                pass
-
-        # Menampilkan total harga
-        self.total_price_label.setText(f"Total Harga: Rp {total_price:,}")
-
-    def go_back_to_pet(self):
-        subprocess.Popen(["python", "pet.py"])
-
-    def go_to_bayar(self):
-        order_number = random.randint(1000, 9999)
-        message = QtWidgets.QMessageBox()
-        message.setIcon(QtWidgets.QMessageBox.Information)
-        message.setText(f"Reservasi berhasil! Nomor Pesanan Anda: {order_number}")
-        message.setWindowTitle("Reservasi Sukses")
-        message.setStandardButtons(QtWidgets.QMessageBox.Ok)
-        message.exec_()
-        subprocess.Popen(["python", "bayar.py"])
-
 
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)

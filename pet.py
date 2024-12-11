@@ -1,6 +1,11 @@
 from PyQt5 import QtCore, QtGui, QtWidgets
 import sys
-import subprocess  # Untuk menjalankan file eksternal
+
+# Import window-window lain
+from reser import Ui_MainWindow as ReservationWindow
+from riwa import Ui_MainWindow as HistoryWindow
+from gale import Ui_MainWindow as GalleryWindow
+from logout import Ui_MainWindow as LogoutWindow
 
 class BimaProfileWindow(QtWidgets.QWidget):
     def __init__(self):
@@ -55,8 +60,6 @@ class Ui_MainWindow(object):
         self.background_label = QtWidgets.QLabel(self.centralwidget)
         self.background_label.setPixmap(QtGui.QPixmap("hol.jpg"))  # Pastikan path benar
         self.background_label.setScaledContents(True)
-        self.background_label.setGeometry(0, 0, 800, 600)  # Menentukan ukuran gambar
-        self.background_label.lower()  # Pastikan gambar berada di lapisan bawah
         self.main_layout.addWidget(self.background_label)
 
         # Container untuk elemen-elemen
@@ -117,7 +120,7 @@ class Ui_MainWindow(object):
             border: none;
             box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
         """)
-        self.pushButton_2.clicked.connect(self.open_reservation)  # Connect to reser.py
+        self.pushButton_2.clicked.connect(lambda: self.open_reservation_window(MainWindow))
         self.button_layout.addWidget(self.pushButton_2)
 
         # Tombol History
@@ -132,7 +135,7 @@ class Ui_MainWindow(object):
             border: none;
             box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
         """)
-        self.pushButton_3.clicked.connect(self.open_history)
+        self.pushButton_3.clicked.connect(lambda: self.open_history_window(MainWindow))
         self.button_layout.addWidget(self.pushButton_3)
 
         # Tombol Gallery
@@ -147,7 +150,7 @@ class Ui_MainWindow(object):
             border: none;
             box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
         """)
-        self.pushButton_7.clicked.connect(self.open_gallery)  # Connect to gale.py
+        self.pushButton_7.clicked.connect(lambda: self.open_gallery_window(MainWindow))
         self.button_layout.addWidget(self.pushButton_7)
 
         # Tombol Staff Profile for Bima
@@ -177,7 +180,7 @@ class Ui_MainWindow(object):
             border: none;
             box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
         """)
-        self.logout_button.clicked.connect(self.open_logout)
+        self.logout_button.clicked.connect(lambda: self.open_logout_window(MainWindow))
         self.button_layout.addWidget(self.logout_button)
 
         self.overlay_layout.addLayout(self.button_layout)
@@ -190,8 +193,7 @@ class Ui_MainWindow(object):
         room_details = {
             "Deluxe Room": "Harga: Rp 1.200.000/malam\nFasilitas: TV, Wi-Fi, AC, Kamar Mandi",
             "Suite Room": "Harga: Rp 2.000.000/malam\nFasilitas: TV, Wi-Fi, AC, Balkon, Kamar Mandi",
-            "Executive Suite": "Harga: Rp 3.500.000/malam\nFasilitas: TV, Wi-Fi, AC, Ruang Tamu, Kamar Mandi",
-            "Presidential Suite": "Harga: Rp 10.000.000/malam\nFasilitas: TV, Wi-Fi, AC, Kolam Renang Pribadi, Dua Kamar Tidur, Kamar Mandi",
+            "Presidential Room": "Harga: Rp 10.000.000/malam\nFasilitas: TV, Wi-Fi, AC, Kolam Renang Pribadi, Dua Kamar Tidur",
         }
 
         if selected in room_details:
@@ -206,26 +208,38 @@ class Ui_MainWindow(object):
         self.bima_profile_window = BimaProfileWindow()
         self.bima_profile_window.show()
 
-    def open_history(self):
-        subprocess.Popen(["python", "riwa.py"])
-        QtWidgets.QApplication.quit()  # Menutup aplikasi setelah membuka riwa.py
+    def open_reservation_window(self, MainWindow):
+        self.window = QtWidgets.QMainWindow()
+        self.ui = ReservationWindow()
+        self.ui.setupUi(self.window)
+        MainWindow.close()
+        self.window.showMaximized()
 
-    def open_reservation(self):
-        subprocess.Popen(["python", "reser.py"])  # Open reser.py
-        QtWidgets.QApplication.quit()  # Menutup aplikasi setelah membuka reser.py
+    def open_history_window(self, MainWindow):
+        self.window = QtWidgets.QMainWindow()
+        self.ui = HistoryWindow()
+        self.ui.setupUi(self.window)
+        MainWindow.close()
+        self.window.showMaximized()
 
-    def open_gallery(self):
-        subprocess.Popen(["python", "gale.py"])  # Open gale.py
-        QtWidgets.QApplication.quit()  # Menutup aplikasi setelah membuka gale.py
+    def open_gallery_window(self, MainWindow):
+        self.window = QtWidgets.QMainWindow()
+        self.ui = GalleryWindow()
+        self.ui.setupUi(self.window)
+        MainWindow.close()
+        self.window.showMaximized()
 
-    def open_logout(self):
-        subprocess.Popen(["python", "logout.py"])
-        QtWidgets.QApplication.quit()  # Menutup aplikasi setelah membuka logout.py
+    def open_logout_window(self, MainWindow):
+        self.window = QtWidgets.QMainWindow()
+        self.ui = LogoutWindow()
+        self.ui.setupUi(self.window)
+        MainWindow.close()
+        self.window.showMaximized()
 
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
     MainWindow = QtWidgets.QMainWindow()
     ui = Ui_MainWindow()
     ui.setupUi(MainWindow)
-    MainWindow.showMaximized()  # Menampilkan MainWindow dalam mode maksimal
+    MainWindow.showMaximized()
     sys.exit(app.exec_())

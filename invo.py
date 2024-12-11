@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 from PyQt5 import QtCore, QtGui, QtWidgets
 import subprocess  # Untuk menjalankan file eksternal
+from databasemanager import DatabaseManager
+from PyQt5.QtWidgets import QMessageBox
+from datetime import datetime, timedelta
 
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
@@ -56,18 +59,18 @@ class Ui_MainWindow(object):
         self.detailsLayout.setHorizontalSpacing(30)
         self.detailsLayout.setVerticalSpacing(10)
 
-        self.add_detail("Nama Pelanggan:", "Bima Sakti")
-        self.add_detail("Nomor Pemesanan:", "IP778")
-        self.add_detail("Nomor Kamar:", "305, 306")
-        self.add_detail("Jenis Kamar:", "Deluxe Room")
-        self.add_detail("Jumlah Kamar:", "2")
-        self.add_detail("Tanggal Check-In:", "2024-12-01")
-        self.add_detail("Tanggal Check-Out:", "2024-12-05")
-        self.add_detail("Total Hari:", "4")
-        self.add_detail("Jumlah Orang Menginap:", "2 Orang")
-        self.add_detail("Fasilitas:", "Gym")
-        self.add_detail("Metode Pembayaran:", "Cash")
-        self.add_detail("Total Pembayaran:", "Rp 4,000,000")
+        self.add_detail("Nama Pelanggan:", "")
+        self.add_detail("Nomor Pemesanan:", "")
+        self.add_detail("Nomor Kamar:", "")
+        self.add_detail("Jenis Kamar:", "")
+        self.add_detail("Jumlah Kamar:", "")
+        self.add_detail("Tanggal Check-In:", "")
+        self.add_detail("Tanggal Check-Out:", "")
+        self.add_detail("Total Hari:", "")
+        self.add_detail("Jumlah Orang Menginap:", "")
+        self.add_detail("Fasilitas:", "")
+        self.add_detail("Metode Pembayaran:", "")
+        self.add_detail("Total Pembayaran:", "")
 
         self.mainLayout.addLayout(self.detailsLayout)
 
@@ -119,6 +122,8 @@ class Ui_MainWindow(object):
         self.retranslateUi(MainWindow)
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
 
+        self.load_latest_payment_details()
+
     def add_detail(self, label_text, value_text):
         label = QtWidgets.QLabel(label_text)
         label.setStyleSheet("font-size: 16px; font-weight: bold; color: #005073;")
@@ -142,6 +147,72 @@ class Ui_MainWindow(object):
         subprocess.Popen(["python", "logout.py"])  # Open logout.py
         QtWidgets.QApplication.quit()  # Close current window
 
+    def load_latest_payment_details(self):
+        # Use DatabaseManager to get the latest payment details
+        db_manager = DatabaseManager()
+        
+        try:
+            # First, get the latest payment
+            query = """
+            SELECT reservation_id, payment_date, amount, payment_method
+            FROM payments
+            ORDER BY payment_date DESC
+            LIMIT 1
+            """
+            db_manager.cursor.execute(query)
+            payment_details = db_manager.cursor.fetchone()
+            
+            if payment_details:
+                # Get full reservation details using the reservation ID
+                reservation_details = db_manager.get_reservation_details(payment_details['reservation_id'])
+                
+                if reservation_details:
+                    # Combine payment and reservation details
+                    merged_details = {**payment_details, **reservation_details}
+                    self.update_invoice_details(merged_details)
+        except Exception as e:
+            print(f"Error loading payment details: {e}")
+            QMessageBox.critical(None, "Error", f"Could not load payment details: {e}")
+        finally:
+            db_manager.close()
+
+    def update_invoice_details(self, details):
+        # Convert datetime objects to formatted date strings
+        check_in_date = details['check_in_date'].strftime("%Y-%m-%d") if details['check_in_date'] else "N/A"
+        check_out_date = details['check_out_date'].strftime("%Y-%m-%d") if details['check_out_date'] else "N/A"
+        
+        # Calculate total days
+        total_days = (details['check_out_date'] - details['check_in_date']).days if details['check_in_date'] and details['check_out_date'] else 0
+        
+        # Format room details
+        room_details = ", ".join([f"{room['room_number']} ({room['type_name']})" for room in details.get('rooms', [])])
+        
+        # Format facilities details
+        facility_details = ", ".join([f"{facility['facility_name']}" for facility in details.get('facilities', [])])
+        
+        # Prepare details for form
+        invoice_details = [
+            ("Nama Pelanggan:", details.get('customer_name', 'N/A')),
+            ("Nomor Pemesanan:", str(details.get('id', 'N/A'))),
+            ("Nomor Kamar:", room_details),
+            ("Jenis Kamar:", room_details),
+            ("Jumlah Kamar:", str(len(details.get('rooms', [])))),
+            ("Tanggal Check-In:", check_in_date),
+            ("Tanggal Check-Out:", check_out_date),
+            ("Total Hari:", str(total_days)),
+            ("Jumlah Orang Menginap:", str(details.get('total_people', 0))),
+            ("Fasilitas:", facility_details),
+            ("Metode Pembayaran:", details.get('payment_method', 'N/A')),
+            ("Total Pembayaran:", f"Rp {details.get('amount', 0):,.2f}")
+        ]
+        
+        # Clear existing details
+        while self.detailsLayout.rowCount() > 0:
+            self.detailsLayout.removeRow(0)
+        
+        # Add new details
+        for label_text, value_text in invoice_details:
+            self.add_detail(label_text, str(value_text))
 
 if __name__ == "__main__":
     import sys
