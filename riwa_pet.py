@@ -20,7 +20,7 @@ class Ui_MainWindow(object):
 
         # Search Bar
         self.search_bar = QtWidgets.QLineEdit(self.centralwidget)
-        self.search_bar.setPlaceholderText("Cari berdasarkan Nama, Jenis Kamar, atau Status...")
+        self.search_bar.setPlaceholderText("Cari berdasarkan Nama atau Jenis Kamar")
         self.search_bar.setStyleSheet("""
             QLineEdit {
                 font-size: 16px;
@@ -55,8 +55,9 @@ class Ui_MainWindow(object):
         # Table Widget
         self.tableWidget = QtWidgets.QTableWidget(self.centralwidget)
         self.tableWidget.setRowCount(0)
-        self.tableWidget.setColumnCount(5)
-        self.tableWidget.setHorizontalHeaderLabels(["Tanggal Pemesanan", "Nama", "Jenis Kamar", "Total", "Status"])
+        self.tableWidget.setColumnCount(4)
+        self.tableWidget.setHorizontalHeaderLabels(["Tanggal Pemesanan", "Nama", "Jenis Kamar", "Total"])
+        # self.tableWidget.setHorizontalHeaderLabels(["Tanggal Pemesanan", "Nama", "Jenis Kamar", "Total", "Status"])
         self.tableWidget.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
         self.tableWidget.verticalHeader().setVisible(False)
         self.tableWidget.setEditTriggers(QtWidgets.QTableWidget.NoEditTriggers)
@@ -160,8 +161,7 @@ class Ui_MainWindow(object):
                 JOIN reservation_rooms ON reservation_rooms.room_id = rooms.id 
                 WHERE reservation_rooms.reservation_id = reservations.id 
                 LIMIT 1) AS jenis_kamar, 
-                total_price AS total, 
-                status 
+                total_price AS total
             FROM 
                 reservations
             ORDER BY 
@@ -196,7 +196,7 @@ class Ui_MainWindow(object):
                 self.tableWidget.setItem(row_position, 1, QtWidgets.QTableWidgetItem(str(row_data['nama'])))
                 self.tableWidget.setItem(row_position, 2, QtWidgets.QTableWidgetItem(str(row_data['jenis_kamar'])))
                 self.tableWidget.setItem(row_position, 3, QtWidgets.QTableWidgetItem(total))
-                self.tableWidget.setItem(row_position, 4, QtWidgets.QTableWidgetItem(row_data['status']))
+                # self.tableWidget.setItem(row_position, 4, QtWidgets.QTableWidgetItem(row_data['status']))
 
         except Exception as e:
             QMessageBox.critical(None, "Database Error", f"Error loading reservation history: {str(e)}")
