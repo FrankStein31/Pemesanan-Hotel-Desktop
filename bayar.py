@@ -12,6 +12,8 @@ class Ui_MainWindow(object):
         self.reservation_data = reservation_data
         self.db_manager = DatabaseManager()
         self.invoice_window = None 
+        self.original_total = 0
+        self.discounted_total = 0
 
     def setupUi(self, MainWindow):
         MainWindow.setObjectName("MainWindow")
@@ -86,6 +88,44 @@ class Ui_MainWindow(object):
         self.layout.addWidget(self.reservation_label)
         self.layout.addWidget(self.reservation_combo)
 
+        # Voucher Input
+        self.voucher_label = QtWidgets.QLabel("Kode Voucher (Optional):")
+        self.voucher_label.setStyleSheet("""
+            color: #ffffff;
+            font-family: 'Roboto', sans-serif;
+            font-size: 16px;
+        """)
+        self.voucher_input = QtWidgets.QLineEdit()
+        self.voucher_input.setPlaceholderText("Masukkan kode voucher jika ada")
+        self.voucher_input.setStyleSheet("""
+            padding: 12px; 
+            font-size: 14px; 
+            border: 2px solid #ff77ff; 
+            border-radius: 12px; 
+            background-color: #2e2e3e; 
+            color: #ffffff;
+            font-family: 'Roboto', sans-serif;
+        """)
+        self.voucher_button = QtWidgets.QPushButton("Verifikasi Voucher")
+        self.voucher_button.setStyleSheet("""
+            background-color: #4285f4; 
+            color: white; 
+            font-weight: bold; 
+            padding: 10px; 
+            border-radius: 10px;
+            font-size: 14px;
+            text-shadow: 1px 1px 3px #000000;
+        """)
+        self.voucher_button.clicked.connect(self.verify_voucher)
+        
+        # Voucher layout
+        self.voucher_layout = QtWidgets.QHBoxLayout()
+        self.voucher_layout.addWidget(self.voucher_input)
+        self.voucher_layout.addWidget(self.voucher_button)
+        
+        self.layout.addWidget(self.voucher_label)
+        self.layout.addLayout(self.voucher_layout)
+
         # Metode Pembayaran
         self.payment_label = QtWidgets.QLabel("Metode Pembayaran:")
         self.payment_label.setStyleSheet("""
@@ -127,8 +167,37 @@ class Ui_MainWindow(object):
             color: #ffffff;
             font-family: 'Roboto', sans-serif;
         """)
-        self.layout.addWidget(self.total_label)
-        self.layout.addWidget(self.total_input)
+        
+        # Discount Label
+        self.discount_label = QtWidgets.QLabel("Diskon:")
+        self.discount_label.setStyleSheet("""
+            color: #ffffff;
+            font-family: 'Roboto', sans-serif;
+            font-size: 16px;
+        """)
+        self.discount_input = QtWidgets.QLineEdit()
+        self.discount_input.setReadOnly(True)
+        self.discount_input.setStyleSheet("""
+            padding: 12px; 
+            font-size: 14px; 
+            border: 2px solid #ff77ff; 
+            border-radius: 12px; 
+            background-color: #2e2e3e; 
+            color: #ffffff;
+            font-family: 'Roboto', sans-serif;
+        """)
+        
+        # Total layout
+        self.total_detail_layout = QtWidgets.QHBoxLayout()
+        self.total_detail_layout.addWidget(self.total_label)
+        self.total_detail_layout.addWidget(self.discount_label)
+        
+        self.total_input_layout = QtWidgets.QHBoxLayout()
+        self.total_input_layout.addWidget(self.total_input)
+        self.total_input_layout.addWidget(self.discount_input)
+        
+        self.layout.addLayout(self.total_detail_layout)
+        self.layout.addLayout(self.total_input_layout)
 
         # Add a stretch to push the buttons to the bottom
         self.layout.addStretch(1)
@@ -281,6 +350,10 @@ class Ui_MainWindow(object):
                 QtWidgets.QMessageBox.warning(None, "Error", f"Gagal memuat reservasi: {str(e)}")
 
     def load_reservation_total(self):
+        # Reset voucher and discount
+        self.voucher_input.clear()
+        self.discount_input.setText("0")
+        
         # Get current selected reservation
         reservation_index = self.reservation_combo.currentIndex()
         if reservation_index > 0:
@@ -291,10 +364,54 @@ class Ui_MainWindow(object):
                 reservation = self.db_manager.get_reservation_details(reservation_id)
                 
                 if reservation:
+                    # Store original total
+                    self.original_total = int(reservation['total_price'])
+                    self.discounted_total = self.original_total
+                    
                     # Set total in the input field
-                    self.total_input.setText(f"{int(reservation['total_price']):,}")
+                    self.total_input.setText(f"{self.original_total:,}")
             except Exception as e:
                 QtWidgets.QMessageBox.warning(None, "Error", f"Gagal memuat detail reservasi: {str(e)}")
+
+    def verify_voucher(self):
+        # Get voucher code
+        voucher_code = self.voucher_input.text().strip()
+        
+        if not voucher_code:
+            QtWidgets.QMessageBox.warning(None, "Peringatan", "Masukkan kode voucher!")
+            return
+        
+        # Verify voucher
+        voucher = self.db_manager.verify_voucher(voucher_code)
+        
+        if voucher:
+            # Calculate discount
+            discount_percentage = voucher['discount_percentage']
+            discount_amount = int(self.original_total * (discount_percentage / 100))
+            
+            # Apply discount
+            self.discounted_total = self.original_total - discount_amount
+            
+            # Update UI
+            self.total_input.setText(f"{self.discounted_total:,}")
+            self.discount_input.setText(f"{discount_amount:,}")
+            
+            QtWidgets.QMessageBox.information(
+                None, 
+                "Voucher Berhasil", 
+                f"Voucher berhasil digunakan! Diskon {discount_percentage}%"
+            )
+        else:
+            # Reset to original total
+            self.discounted_total = self.original_total
+            self.total_input.setText(f"{self.original_total:,}")
+            self.discount_input.setText("0")
+            
+            QtWidgets.QMessageBox.warning(
+                None, 
+                "Voucher Tidak Valid", 
+                "Kode voucher tidak valid atau sudah tidak berlaku."
+            )
 
     def confirm_payment(self):
         # Validasi input

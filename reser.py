@@ -408,7 +408,6 @@ class Ui_MainWindow(object):
         # Calculate total price
         total_price = self.calculate_total_price()
 
-        # Add customer with retrieved details
         # customer_id = self.db_manager.add_customer(
         #     name=selected_customer['name'],
         #     address=selected_customer.get('address', 'N/A'),
