@@ -138,11 +138,11 @@ class Ui_MainWindow(object):
         """
         Close current window and return to main dashboard
         """
-        from dash import Ui_MainWindow as DashboardWindow
+        from pet import Ui_MainWindow as DashboardWindowpet
         
         # Import here to avoid circular import
         self.window = QtWidgets.QMainWindow()
-        self.ui = DashboardWindow()
+        self.ui = DashboardWindowpet()
         self.ui.setupUi(self.window)
         QtWidgets.QApplication.activeWindow().close()
         self.window.showMaximized()

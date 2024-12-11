@@ -164,22 +164,36 @@ class Ui_MainWindow(object):
         self.ui.setupUi(self.window)
         self.window.showMaximized()  # Full screen for Data Pelanggan window
 
+    # def go_back(self):
+    #     """Go back to the main menu"""
+    #     print("Returning to main menu")
+    #     if self.previous_window:
+    #         self.previous_window.show()
+    #     self.MainWindow.close()
+
     def go_back(self):
-        """Go back to the main menu"""
-        print("Returning to main menu")
-        if self.previous_window:
-            self.previous_window.show()
-        self.MainWindow.close()
+        """
+        Close current window and return to main dashboard
+        """
+        from dash import Ui_MainWindow as DashboardWindow
+        
+        # Import here to avoid circular import
+        self.window = QtWidgets.QMainWindow()
+        self.ui = DashboardWindow()
+        self.ui.setupUi(self.window)
+        QtWidgets.QApplication.activeWindow().close()
+        self.window.showMaximized()
 
     def logout(self):
         """Logout and navigate to logout.py"""
         print("Logging out")
+        from logout import Ui_MainWindow as LogoutWindow
+
         self.window = QtWidgets.QMainWindow()
         self.ui = LogoutWindow()  # Instance of the logout window
         self.ui.setupUi(self.window)
-        self.window.showMaximized()  # Full screen for logout window
-        self.window.raise_()  # Bring the logout window to the front
-        MainWindow.close()  # Close the current window
+        QtWidgets.QApplication.activeWindow().close()
+        self.window.showMaximized()
 
 if __name__ == "__main__":
     import sys

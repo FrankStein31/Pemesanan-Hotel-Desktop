@@ -76,7 +76,9 @@ class Ui_MainWindow(object):
         """)
 
         # Membuat tombol bisa menutup aplikasi
-        self.pushButton.clicked.connect(MainWindow.close)
+        # self.pushButton.clicked.connect(MainWindow.close)
+        self.pushButton.clicked.connect(self.go_back_welcome)
+
 
         # Menambahkan tombol ke layout
         main_layout = QtWidgets.QVBoxLayout(self.centralwidget)
@@ -96,6 +98,17 @@ class Ui_MainWindow(object):
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
         MainWindow.setWindowTitle(_translate("MainWindow", "Terimakasih"))
+
+    def go_back_welcome(self):
+        """
+        Close current window and return to main dashboard
+        """
+        from wel import AcumalakaHotelApp as WelcomePage  # Impor halaman utama
+
+        # Membuat jendela utama
+        self.window = WelcomePage()  # Buat instance langsung
+        QtWidgets.QApplication.activeWindow().close()  # Tutup jendela saat ini
+        self.window.showMaximized()  # Tampilkan halaman utama dalam mode fullscreen
 
 if __name__ == "__main__":
     import sys

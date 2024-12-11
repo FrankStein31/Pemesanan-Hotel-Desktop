@@ -3,8 +3,8 @@ import sys
 
 # Import window-window lain
 from reser import Ui_MainWindow as ReservationWindow
-from riwa import Ui_MainWindow as HistoryWindow
-from gale import Ui_MainWindow as GalleryWindow
+from riwa_pet import Ui_MainWindow as HistoryWindow
+from gale_pet import Ui_MainWindow as GalleryWindow
 from logout import Ui_MainWindow as LogoutWindow
 
 class BimaProfileWindow(QtWidgets.QWidget):

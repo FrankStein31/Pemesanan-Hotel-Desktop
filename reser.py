@@ -117,7 +117,7 @@ class Ui_MainWindow(object):
         # Tombol navigasi
         self.buttonLayout = QtWidgets.QHBoxLayout()
         self.backButton = self.create_button("Kembali")
-        self.backButton.clicked.connect(self.go_back_to_pet)
+        self.backButton.clicked.connect(self.go_back)
         self.reserveButton = self.create_button("Reservasi")
         self.reserveButton.clicked.connect(self.go_to_bayar)
         self.buttonLayout.addWidget(self.backButton)
@@ -125,6 +125,19 @@ class Ui_MainWindow(object):
 
         self.titleLayout.addLayout(self.buttonLayout)
         MainWindow.setCentralWidget(self.centralwidget)
+
+    def go_back(self):
+        """
+        Close current window and return to main dashboard
+        """
+        from pet import Ui_MainWindow as DashboardWindowpet
+        
+        # Import here to avoid circular import
+        self.window = QtWidgets.QMainWindow()
+        self.ui = DashboardWindowpet()
+        self.ui.setupUi(self.window)
+        QtWidgets.QApplication.activeWindow().close()
+        self.window.showMaximized()
 
     def create_line_edit(self, placeholder):
         line_edit = QtWidgets.QLineEdit()
@@ -204,10 +217,6 @@ class Ui_MainWindow(object):
         # Update total price label
         self.total_price_label.setText(f"Total Harga: Rp {total_price:,}")
         return total_price
-
-
-    def go_back_to_pet(self):
-        subprocess.Popen(["python", "pet.py"])
 
     def go_to_bayar(self):
         try:
