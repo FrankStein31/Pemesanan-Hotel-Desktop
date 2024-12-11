@@ -231,7 +231,19 @@ class Ui_MainWindow(object):
                 # Populate input fields
                 self.inputFasilitas.setText(facility.get('name', ''))
                 self.inputDeskripsi.setText(facility.get('description', ''))
-                self.inputHarga.setText(facility.get('price', ''))
+                
+                # Convert price to string with dot separators
+                price = facility.get('price', '')
+                if price:
+                    # Convert price to integer first, then format
+                    try:
+                        price_int = int(price)
+                        price_str = f"{price_int:,}".replace(',', '')
+                        self.inputHarga.setText(price_str)
+                    except (ValueError, TypeError):
+                        self.inputHarga.setText(str(price))
+                else:
+                    self.inputHarga.clear()
 
     def add_fasilitas(self):
         name = self.inputFasilitas.text()
