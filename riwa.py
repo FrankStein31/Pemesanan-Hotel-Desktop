@@ -1,6 +1,12 @@
+import sys
 from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtWidgets import QMessageBox
+from databasemanager import DatabaseManager
 
 class Ui_MainWindow(object):
+    def __init__(self):
+        self.db_manager = DatabaseManager()
+
     def setupUi(self, MainWindow):
         MainWindow.setObjectName("MainWindow")
         MainWindow.resize(800, 600)
@@ -27,7 +33,7 @@ class Ui_MainWindow(object):
                 border: 2px solid #1abc9c;
             }
         """)
-        self.search_bar.textChanged.connect(self.filter_table)  # Hubungkan pencarian dengan logika filter
+        self.search_bar.textChanged.connect(self.filter_table)
         main_layout.addWidget(self.search_bar)
 
         # Title Label
@@ -48,7 +54,7 @@ class Ui_MainWindow(object):
 
         # Table Widget
         self.tableWidget = QtWidgets.QTableWidget(self.centralwidget)
-        self.tableWidget.setRowCount(5)
+        self.tableWidget.setRowCount(0)
         self.tableWidget.setColumnCount(5)
         self.tableWidget.setHorizontalHeaderLabels(["Tanggal Pemesanan", "Nama", "Jenis Kamar", "Total", "Status"])
         self.tableWidget.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
@@ -78,23 +84,13 @@ class Ui_MainWindow(object):
             }
         """)
 
-        # Data tabel
-        self.data = [
-            ["12/11/2024", "Sabrina", "Deluxe Room", "Rp 2.500.000", "Diproses"],
-            ["14/11/2024", "Ella Gross", "Suite Room", "Rp 3.000.000", "Dikonfirmasi"],
-            ["15/11/2024", "Mark Lee", "Standard Room", "Rp 500.000", "Dikonfirmasi"],
-            ["16/11/2024", "Balmond", "Deluxe Room", "Rp 2.500.000", "Diproses"],
-            ["17/11/2024", "Rose", "Executive Room", "Rp 1.500.000", "Dikonfirmasi"]
-        ]
-        self.load_table(self.data)
-
         main_layout.addWidget(self.tableWidget)
 
         # Tombol Layout
         button_layout = QtWidgets.QHBoxLayout()
         button_layout.setSpacing(30)
 
-        # Tombol Kembali dengan desain lebih elegan
+        # Tombol Kembali 
         self.backButton = QtWidgets.QPushButton("Kembali", self.centralwidget)
         self.backButton.setStyleSheet("""
             QPushButton {
@@ -112,7 +108,7 @@ class Ui_MainWindow(object):
         """)
         button_layout.addWidget(self.backButton)
 
-        # Tombol Refresh dengan desain lebih elegan
+        # Tombol Refresh
         self.refreshButton = QtWidgets.QPushButton("Refresh", self.centralwidget)
         self.refreshButton.setStyleSheet("""
             QPushButton {
@@ -128,38 +124,106 @@ class Ui_MainWindow(object):
                 background-color: #c0392b;  /* Darker red on hover */
             }
         """)
+        self.refreshButton.clicked.connect(self.load_reservation_history)
         button_layout.addWidget(self.refreshButton)
 
         main_layout.addLayout(button_layout)
         MainWindow.setCentralWidget(self.centralwidget)
 
-    def load_table(self, data):
-        """Mengisi tabel dengan data."""
-        self.tableWidget.setRowCount(len(data))
-        for row, row_data in enumerate(data):
-            for col, value in enumerate(row_data):
-                self.tableWidget.setItem(row, col, QtWidgets.QTableWidgetItem(value))
+        # Load reservation history when the window is set up
+        self.load_reservation_history()
+
+    def load_reservation_history(self):
+        """Mengambil data riwayat reservasi dari database."""
+        try:
+            # Query reservasi dengan detail customer dan ruangan
+            query = """
+            SELECT 
+                r.id AS reservation_id,
+                r.created_at AS tanggal_pemesanan, 
+                c.name AS nama, 
+                rt.type_name AS jenis_kamar, 
+                r.total_price AS total, 
+                r.status 
+            FROM 
+                reservations r
+            JOIN 
+                customers c ON r.customer_id = c.id
+            JOIN 
+                reservation_rooms rr ON r.id = rr.reservation_id
+            JOIN 
+                rooms rm ON rr.room_id = rm.id
+            JOIN 
+                room_types rt ON rm.room_type_id = rt.id
+            ORDER BY 
+                r.created_at DESC
+            """
+            
+            # Print database connection status
+            print("Database connection:", self.db_manager.connection is not None)
+            print("Database cursor:", self.db_manager.cursor is not None)
+            
+            # Execute query
+            self.db_manager.cursor.execute(query)
+            results = self.db_manager.cursor.fetchall()
+            
+            # Print results
+            print("Number of reservations:", len(results))
+            for result in results:
+                print(result)
+
+            # Clear existing rows
+            self.tableWidget.setRowCount(0)
+
+            # Populate table
+            for row_data in results:
+                row_position = self.tableWidget.rowCount()
+                self.tableWidget.insertRow(row_position)
+                
+                # Format date
+                date = row_data['tanggal_pemesanan'].strftime("%d/%m/%Y")
+                
+                # Format total price
+                total = f"Rp {row_data['total']:,.0f}".replace(',', '.')
+
+                # Set table items
+                self.tableWidget.setItem(row_position, 0, QtWidgets.QTableWidgetItem(str(date)))
+                self.tableWidget.setItem(row_position, 1, QtWidgets.QTableWidgetItem(row_data['nama']))
+                self.tableWidget.setItem(row_position, 2, QtWidgets.QTableWidgetItem(row_data['jenis_kamar']))
+                self.tableWidget.setItem(row_position, 3, QtWidgets.QTableWidgetItem(total))
+                self.tableWidget.setItem(row_position, 4, QtWidgets.QTableWidgetItem(row_data['status']))
+
+        except Exception as e:
+            QMessageBox.critical(None, "Database Error", f"Error loading reservation history: {str(e)}")
+            print(f"Detailed error: {e}")
+            import traceback
+            traceback.print_exc()
 
     def filter_table(self):
-        """Logika untuk menyaring data di tabel berdasarkan Nama, Jenis Kamar, atau Status."""
+        """Filter tabel berdasarkan input pencarian."""
         query = self.search_bar.text().lower()
-        filtered_data = [
-            row for row in self.data
-            if query in row[1].lower()  # Mencari di Nama
-            or query in row[2].lower()  # Mencari di Jenis Kamar
-            or query in row[4].lower()  # Mencari di Status
-        ]
-        self.load_table(filtered_data)
+        
+        for row in range(self.tableWidget.rowCount()):
+            # Tentukan apakah baris harus ditampilkan
+            show_row = query == "" or any(
+                query in str(self.tableWidget.item(row, col).text()).lower() 
+                for col in range(self.tableWidget.columnCount())
+            )
+            
+            self.tableWidget.setRowHidden(row, QtCore.QModelIndex(), not show_row)
 
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
         MainWindow.setWindowTitle(_translate("MainWindow", "Riwayat Pemesanan"))
 
+class MainWindowWithHistory(QtWidgets.QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.ui = Ui_MainWindow()
+        self.ui.setupUi(self)
+
 if __name__ == "__main__":
-    import sys
     app = QtWidgets.QApplication(sys.argv)
-    MainWindow = QtWidgets.QMainWindow()
-    ui = Ui_MainWindow()
-    ui.setupUi(MainWindow)
+    MainWindow = MainWindowWithHistory()
     MainWindow.showMaximized()
     sys.exit(app.exec_())
