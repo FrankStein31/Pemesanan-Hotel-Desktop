@@ -335,6 +335,9 @@ class DatabaseManager:
             for room_id in room_ids:
                 self.cursor.execute(room_query, (reservation_id, room_id))
 
+            update_room_status_query = "UPDATE rooms SET status = 'Terisi' WHERE id IN (%s)" % ','.join(map(str, room_ids))
+            self.cursor.execute(update_room_status_query)
+
             # Insert reservation facilities
             facility_query = "INSERT INTO reservation_facilities (reservation_id, facility_id) VALUES (%s, %s)"
             for facility_id in facility_ids:
