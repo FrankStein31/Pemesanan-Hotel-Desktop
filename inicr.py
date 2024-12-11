@@ -1,4 +1,5 @@
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5 import QtCore, QtGui
+from PyQt5 import QtWidgets
 from crud import Ui_MainWindow as CrudWindow  # Mengimpor CRUD dari crud.py
 from kmr import Ui_MainWindow as KmrWindow  # Mengimpor kelas dari kmr.py
 from fas import Ui_MainWindow as FasilitasWindow  # Mengimpor kelas Fasilitas dari fas.py
@@ -6,7 +7,11 @@ from dp import Ui_MainWindow as DpWindow  # Mengimpor Data Pelanggan dari dp.py
 from logout import Ui_MainWindow as LogoutWindow  # Mengimpor kelas dari logout.py
 
 class Ui_MainWindow(object):
+    def __init__(self, previous_window=None):
+        self.previous_window = previous_window
+
     def setupUi(self, MainWindow):
+        self.MainWindow = MainWindow  # Menyimpan referensi untuk MainWindow
         MainWindow.setObjectName("MainWindow")
         MainWindow.setWindowTitle("Hotel Acumalaka")
         MainWindow.resize(800, 600)  # Atur ukuran awal jika dibutuhkan, namun kita akan full screen
@@ -162,6 +167,9 @@ class Ui_MainWindow(object):
     def go_back(self):
         """Go back to the main menu"""
         print("Returning to main menu")
+        if self.previous_window:
+            self.previous_window.show()
+        self.MainWindow.close()
 
     def logout(self):
         """Logout and navigate to logout.py"""

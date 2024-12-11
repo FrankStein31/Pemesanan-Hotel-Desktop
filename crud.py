@@ -1,6 +1,10 @@
 from PyQt5 import QtCore, QtGui, QtWidgets
+from databasemanager import DatabaseManager
 
 class Ui_MainWindow(object):
+    def __init__(self):
+        self.db_manager = DatabaseManager()
+
     def setupUi(self, MainWindow):
         MainWindow.setObjectName("MainWindow")
         MainWindow.resize(900, 650)
@@ -47,7 +51,11 @@ class Ui_MainWindow(object):
         
         form_layout = QtWidgets.QVBoxLayout(self.form_groupbox)
         self.add_input(form_layout, "Nomor Kamar:", "input_room_number")
-        self.add_combobox(form_layout, "Tipe Kamar:", "input_room_type", ["Standart", "Executive", "Deluxe", "Suite", "Presidential"])
+        
+        # Modified room type input to use database
+        self.add_combobox(form_layout, "Tipe Kamar:", "input_room_type", 
+                          [rt['type_name'] for rt in self.db_manager.get_room_types()])
+        
         self.add_input(form_layout, "Harga Kamar:", "input_room_price")
         self.add_combobox(form_layout, "Status Kamar:", "input_room_status", ["Tersedia", "Terisi"])
 
@@ -84,9 +92,13 @@ class Ui_MainWindow(object):
 
         # Room Table
         self.room_table = QtWidgets.QTableWidget(self.centralwidget)
-        self.room_table.setColumnCount(4)
-        self.room_table.setHorizontalHeaderLabels(["Nomor Kamar", "Tipe Kamar", "Harga", "Status"])
+        self.room_table.setColumnCount(5)  # Added column for room ID
+        self.room_table.setHorizontalHeaderLabels(["ID", "Nomor Kamar", "Tipe Kamar", "Harga", "Status"])
         self.room_table.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
+        self.room_table.hideColumn(0)  # Hide ID column
+        
+        # Connect table row selection to form filling
+        self.room_table.itemSelectionChanged.connect(self.fill_form_from_table)
         
         # Set Table and Header Styles
         self.room_table.setStyleSheet("""
@@ -127,8 +139,37 @@ class Ui_MainWindow(object):
 
         MainWindow.setCentralWidget(self.centralwidget)
 
-        # Add 5 predefined rooms to the table
-        self.add_predefined_rooms()
+        # Load rooms from database
+        self.load_rooms_from_database()
+
+    def load_rooms_from_database(self):
+        # Clear existing rows
+        self.room_table.setRowCount(0)
+        
+        # Get rooms from database
+        rooms = self.db_manager.get_rooms()
+        
+        for room in rooms:
+            row_position = self.room_table.rowCount()
+            self.room_table.insertRow(row_position)
+            
+            # Add room details to table
+            self.room_table.setItem(row_position, 0, QtWidgets.QTableWidgetItem(str(room['id'])))
+            self.room_table.setItem(row_position, 1, QtWidgets.QTableWidgetItem(room['room_number']))
+            self.room_table.setItem(row_position, 2, QtWidgets.QTableWidgetItem(room['type_name']))
+            self.room_table.setItem(row_position, 3, QtWidgets.QTableWidgetItem(str(room['price'])))
+            self.room_table.setItem(row_position, 4, QtWidgets.QTableWidgetItem(room['status']))
+
+    def fill_form_from_table(self):
+        # Get current selected row
+        row = self.room_table.currentRow()
+        if row != -1:
+            # Fill input fields from table row
+            self.input_room_number.setText(self.room_table.item(row, 1).text())
+            room_type = self.room_table.item(row, 2).text()
+            self.input_room_type.setCurrentText(room_type)
+            self.input_room_price.setText(self.room_table.item(row, 3).text())
+            self.input_room_status.setCurrentText(self.room_table.item(row, 4).text())
 
     def add_input(self, layout, label_text, input_name):
         layout_widget = QtWidgets.QHBoxLayout()
@@ -174,37 +215,70 @@ class Ui_MainWindow(object):
         layout.addWidget(button)
 
     def add_room(self):
-        row_position = self.room_table.rowCount()
         room_number = self.input_room_number.text()
         room_type = self.input_room_type.currentText()
         room_price = self.input_room_price.text()
         room_status = self.input_room_status.currentText()
 
-        if room_number and room_price:
-            self.room_table.insertRow(row_position)
-            self.room_table.setItem(row_position, 0, QtWidgets.QTableWidgetItem(room_number))
-            self.room_table.setItem(row_position, 1, QtWidgets.QTableWidgetItem(room_type))
-            self.room_table.setItem(row_position, 2, QtWidgets.QTableWidgetItem(room_price))
-            self.room_table.setItem(row_position, 3, QtWidgets.QTableWidgetItem(room_status))
-            self.statusbar.showMessage("Kamar berhasil ditambahkan!", 2000)
-            self.clear_form()
+        # Find room type ID
+        room_types = self.db_manager.get_room_types()
+        room_type_id = next((rt['id'] for rt in room_types if rt['type_name'] == room_type), None)
+
+        if room_number and room_type_id and room_price:
+            # Add room to database
+            room_id = self.db_manager.add_room(room_number, room_type_id, room_status)
+            
+            if room_id:
+                # Reload rooms from database to reflect changes
+                self.load_rooms_from_database()
+                self.statusbar.showMessage("Kamar berhasil ditambahkan!", 2000)
+                self.clear_form()
+            else:
+                self.statusbar.showMessage("Gagal menambahkan kamar!", 2000)
         else:
             self.statusbar.showMessage("Isi semua data!", 2000)
 
     def update_room(self):
         row = self.room_table.currentRow()
         if row != -1:
-            self.room_table.setItem(row, 0, QtWidgets.QTableWidgetItem(self.input_room_number.text()))
-            self.room_table.setItem(row, 1, QtWidgets.QTableWidgetItem(self.input_room_type.currentText()))
-            self.room_table.setItem(row, 2, QtWidgets.QTableWidgetItem(self.input_room_price.text()))
-            self.room_table.setItem(row, 3, QtWidgets.QTableWidgetItem(self.input_room_status.currentText()))
-            self.statusbar.showMessage("Kamar berhasil diperbarui!", 2000)
+            # Get room ID from hidden column
+            room_id = int(self.room_table.item(row, 0).text())
+            room_number = self.input_room_number.text()
+            room_type = self.input_room_type.currentText()
+            room_status = self.input_room_status.currentText()
+
+            # Find room type ID
+            room_types = self.db_manager.get_room_types()
+            room_type_id = next((rt['id'] for rt in room_types if rt['type_name'] == room_type), None)
+
+            if room_type_id:
+                # Update room in database
+                if self.db_manager.update_room(room_id, room_number, room_type_id, room_status):
+                    # Reload rooms from database to reflect changes
+                    self.load_rooms_from_database()
+                    self.statusbar.showMessage("Kamar berhasil diperbarui!", 2000)
+                else:
+                    self.statusbar.showMessage("Gagal memperbarui kamar!", 2000)
 
     def delete_room(self):
         row = self.room_table.currentRow()
         if row != -1:
-            self.room_table.removeRow(row)
-            self.statusbar.showMessage("Kamar berhasil dihapus!", 2000)
+            # Get room ID from hidden column
+            room_id = int(self.room_table.item(row, 0).text())
+            
+            # Delete room from database
+            if self.db_manager.delete_room(room_id):
+                # Reload rooms from database to reflect changes
+                self.load_rooms_from_database()
+                self.statusbar.showMessage("Kamar berhasil dihapus!", 2000)
+                self.clear_form()
+            else:
+                self.statusbar.showMessage("Gagal menghapus kamar!", 2000)
+
+    def __del__(self):
+        # Close database connection when UI is destroyed
+        if hasattr(self, 'db_manager'):
+            self.db_manager.close()
 
     def clear_form(self):
         self.input_room_number.clear()
@@ -232,12 +306,15 @@ class Ui_MainWindow(object):
     def filter_rooms(self):
         search_text = self.search_bar.text().lower()
         for row in range(self.room_table.rowCount()):
-            room_number = self.room_table.item(row, 0).text().lower()
-            room_type = self.room_table.item(row, 1).text().lower()
-            room_status = self.room_table.item(row, 3).text().lower()
+            # Sesuaikan index kolom berdasarkan struktur tabel terbaru
+            room_number = self.room_table.item(row, 1).text().lower()  # Kolom 1 adalah Nomor Kamar
+            room_type = self.room_table.item(row, 2).text().lower()    # Kolom 2 adalah Tipe Kamar
+            room_status = self.room_table.item(row, 4).text().lower()  # Kolom 4 adalah Status
 
             # Show row if any cell contains the search text
-            match = search_text in room_number or search_text in room_type or search_text in room_status
+            match = (search_text in room_number or 
+                    search_text in room_type or 
+                    search_text in room_status)
             self.room_table.setRowHidden(row, not match)
 
     def back_action(self):

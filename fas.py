@@ -1,7 +1,12 @@
 # -*- coding: utf-8 -*-
 from PyQt5 import QtCore, QtGui, QtWidgets
+from databasemanager import DatabaseManager
 
 class Ui_MainWindow(object):
+    def __init__(self):
+        self.db_manager = DatabaseManager()
+        self.current_facility_id = None
+
     def setupUi(self, MainWindow):
         MainWindow.setObjectName("MainWindow")
         MainWindow.resize(1000, 700)
@@ -183,77 +188,282 @@ class Ui_MainWindow(object):
             border: 1px solid #B2DFDB;  /* Light teal border */
         """)
         self.mainLayout.addWidget(self.facilityTable)
-
+        self.facilityTable.itemSelectionChanged.connect(self.on_table_item_selected)
         self.facilities = []
 
-        self.add_initial_data()
+        # self.add_initial_data()
+        self.load_facilities()
 
         self.retranslateUi(MainWindow)
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
 
+
     def retranslateUi(self, MainWindow):
         MainWindow.setWindowTitle(QtCore.QCoreApplication.translate("MainWindow", "Fasilitas Hotel Acumalaka"))
+
+    def load_facilities(self):
+        # Clear existing facilities
+        self.facilities = []
+        
+        # Fetch facilities from database
+        db_facilities = self.db_manager.get_facilities()
+        for facility in db_facilities:
+            self.facilities.append({
+                "id": facility['id'],
+                "name": facility['facility_name'],
+                "description": facility['description'],
+                "price": facility['price']
+            })
+        
+        self.update_table()
+
+    def on_table_item_selected(self):
+        # Method to populate input fields when a table row is selected
+        selected_rows = self.facilityTable.selectedItems()
+        if selected_rows:
+            # Calculate the row index (first selected item's row)
+            row = selected_rows[0].row()
+            
+            # Ensure row is within facilities list range
+            if 0 <= row < len(self.facilities):
+                facility = self.facilities[row]
+                
+                # Populate input fields
+                self.inputFasilitas.setText(facility.get('name', ''))
+                self.inputDeskripsi.setText(facility.get('description', ''))
+                self.inputHarga.setText(facility.get('price', ''))
 
     def add_fasilitas(self):
         name = self.inputFasilitas.text()
         description = self.inputDeskripsi.text()
         price = self.inputHarga.text()
+        
         if name and description and price:
-            self.facilities.append({"name": name, "description": description, "price": price})
-            self.update_table()
-            self.inputFasilitas.clear()
-            self.inputDeskripsi.clear()
-            self.inputHarga.clear()
-
-    def update_fasilitas(self):
-        selected_row = self.facilityTable.currentRow()
-        if selected_row >= 0:
-            name = self.inputFasilitas.text()
-            description = self.inputDeskripsi.text()
-            price = self.inputHarga.text()
-            if name and description and price:
-                self.facilities[selected_row] = {"name": name, "description": description, "price": price}
+            # Add to database
+            facility_id = self.db_manager.add_facility(name, description, price)
+            
+            if facility_id:
+                # Add to local list and update table
+                self.facilities.append({
+                    "id": facility_id,
+                    "name": name,
+                    "description": description,
+                    "price": price
+                })
                 self.update_table()
+                
+                # Clear input fields
                 self.inputFasilitas.clear()
                 self.inputDeskripsi.clear()
                 self.inputHarga.clear()
+            else:
+                QtWidgets.QMessageBox.warning(None, "Error", "Gagal menambahkan fasilitas")
+
+    def update_fasilitas(self):
+        # Get the currently selected row
+        selected_rows = self.facilityTable.selectedIndexes()
+        if not selected_rows:
+            QtWidgets.QMessageBox.warning(
+                None, 
+                "Peringatan", 
+                "Pilih fasilitas yang ingin diupdate terlebih dahulu!"
+            )
+            return
+
+        # Get the first selected row
+        row = selected_rows[0].row()
+
+        # Validate input fields
+        name = self.inputFasilitas.text().strip()
+        description = self.inputDeskripsi.text().strip()
+        price = self.inputHarga.text().strip()
+
+        # Check if all fields are filled
+        if not (name and description and price):
+            QtWidgets.QMessageBox.warning(
+                None, 
+                "Peringatan", 
+                "Semua field harus diisi!"
+            )
+            return
+
+        # Confirm update
+        reply = QtWidgets.QMessageBox.question(
+            None, 
+            "Konfirmasi Update", 
+            "Apakah Anda yakin ingin mengupdate fasilitas ini?",
+            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No
+        )
+
+        if reply == QtWidgets.QMessageBox.Yes:
+            try:
+                # Get the facility ID from the current selection
+                facility_id = self.facilities[row].get('id')
+
+                # Update in database
+                if self.db_manager.update_facility(facility_id, name, description, price):
+                    # Update local list
+                    self.facilities[row] = {
+                        'id': facility_id,
+                        'name': name, 
+                        'description': description, 
+                        'price': price
+                    }
+
+                    # Update table
+                    self.update_table()
+
+                    # Clear input fields
+                    self.inputFasilitas.clear()
+                    self.inputDeskripsi.clear()
+                    self.inputHarga.clear()
+
+                    # Show success message
+                    QtWidgets.QMessageBox.information(
+                        None, 
+                        "Berhasil", 
+                        "Fasilitas berhasil diupdate!"
+                    )
+                else:
+                    QtWidgets.QMessageBox.warning(
+                        None, 
+                        "Gagal", 
+                        "Gagal mengupdate fasilitas di database."
+                    )
+            except Exception as e:
+                QtWidgets.QMessageBox.critical(
+                    None, 
+                    "Error", 
+                    f"Terjadi kesalahan: {str(e)}"
+                )
 
     def delete_fasilitas(self):
-        selected_row = self.facilityTable.currentRow()
-        if selected_row >= 0:
-            self.facilities.pop(selected_row)
-            self.update_table()
+        # Get the currently selected rows
+        selected_rows = self.facilityTable.selectedIndexes()
+        if not selected_rows:
+            QtWidgets.QMessageBox.warning(
+                None, 
+                "Peringatan", 
+                "Pilih fasilitas yang ingin dihapus terlebih dahulu!"
+            )
+            return
+
+        # Get the first selected row
+        row = selected_rows[0].row()
+
+        # Confirm deletion
+        reply = QtWidgets.QMessageBox.question(
+            None, 
+            "Konfirmasi Hapus", 
+            "Apakah Anda yakin ingin menghapus fasilitas ini?",
+            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No
+        )
+
+        if reply == QtWidgets.QMessageBox.Yes:
+            try:
+                # Get the facility ID from the current selection
+                facility_id = self.facilities[row].get('id')
+
+                # Delete from database
+                if self.db_manager.delete_facility(facility_id):
+                    # Remove from local list
+                    del self.facilities[row]
+
+                    # Update table
+                    self.update_table()
+
+                    # Clear input fields
+                    self.inputFasilitas.clear()
+                    self.inputDeskripsi.clear()
+                    self.inputHarga.clear()
+
+                    # Show success message
+                    QtWidgets.QMessageBox.information(
+                        None, 
+                        "Berhasil", 
+                        "Fasilitas berhasil dihapus!"
+                    )
+                else:
+                    QtWidgets.QMessageBox.warning(
+                        None, 
+                        "Gagal", 
+                        "Gagal menghapus fasilitas dari database."
+                    )
+            except Exception as e:
+                QtWidgets.QMessageBox.critical(
+                    None, 
+                    "Error", 
+                    f"Terjadi kesalahan: {str(e)}"
+                )
 
     def update_table(self):
+        # Disable sorting during update to prevent unexpected behavior
+        self.facilityTable.setSortingEnabled(False)
+        
+        # Clear existing rows
         self.facilityTable.setRowCount(0)
+        
+        # Ensure facilities list is not None
+        if not self.facilities:
+            self.facilityTable.setSortingEnabled(True)
+            return
+        
+        # Insert rows for each facility
         for facility in self.facilities:
             row_position = self.facilityTable.rowCount()
             self.facilityTable.insertRow(row_position)
-            self.facilityTable.setItem(row_position, 0, QtWidgets.QTableWidgetItem(facility["name"]))
-            self.facilityTable.setItem(row_position, 1, QtWidgets.QTableWidgetItem(facility["description"]))
-            self.facilityTable.setItem(row_position, 2, QtWidgets.QTableWidgetItem(facility["price"]))
+            
+            # Create table items with improved formatting and alignment
+            name_item = QtWidgets.QTableWidgetItem(str(facility.get("name", "")))
+            name_item.setTextAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+            
+            description_item = QtWidgets.QTableWidgetItem(str(facility.get("description", "")))
+            description_item.setTextAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+            
+            price_item = QtWidgets.QTableWidgetItem(str(facility.get("price", "")))
+            price_item.setTextAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
+            
+            # Set items in table
+            self.facilityTable.setItem(row_position, 0, name_item)
+            self.facilityTable.setItem(row_position, 1, description_item)
+            self.facilityTable.setItem(row_position, 2, price_item)
+        
+        # Re-enable sorting
+        self.facilityTable.setSortingEnabled(True)
 
     def filter_table(self):
         search_term = self.searchBar.text().lower()
-        filtered_facilities = [facility for facility in self.facilities if search_term in facility["name"].lower()]
-        self.facilityTable.setRowCount(0)
-        for facility in filtered_facilities:
-            row_position = self.facilityTable.rowCount()
-            self.facilityTable.insertRow(row_position)
-            self.facilityTable.setItem(row_position, 0, QtWidgets.QTableWidgetItem(facility["name"]))
-            self.facilityTable.setItem(row_position, 1, QtWidgets.QTableWidgetItem(facility["description"]))
-            self.facilityTable.setItem(row_position, 2, QtWidgets.QTableWidgetItem(facility["price"]))
-
-    def add_initial_data(self):
-        initial_data = [
-            {"name": "Spa", "description": "Relaksasi dengan layanan spa berkualitas tinggi", "price": "200.000"},
-            {"name": "Game Center", "description": "Pusat hiburan dengan berbagai permainan seru", "price": "150.000"},
-            {"name": "Bioskop", "description": "Nikmati film favorit dengan layar besar", "price": "200.000"},
-            {"name": "Kolam Renang", "description": "Kolam renang outdoor dengan pemandangan indah", "price": "100.000"},
-            {"name": "Gym", "description": "Fasilitas gym lengkap untuk menjaga kebugaran Anda", "price": "75.000"},
-        ]
-        self.facilities.extend(initial_data)
+        
+        # If search term is empty, reload all facilities
+        if not search_term:
+            self.load_facilities()
+            return
+        
+        # Perform database search
+        db_facilities = self.db_manager.search_facilities(search_term)
+        
+        # Update local facilities list and table
+        self.facilities = []
+        for facility in db_facilities:
+            self.facilities.append({
+                "id": facility['id'],
+                "name": facility['facility_name'],
+                "description": facility['description'],
+                "price": facility['price']
+            })
+        
         self.update_table()
+
+    # def add_initial_data(self):
+    #     initial_data = [
+    #         {"name": "Spa", "description": "Relaksasi dengan layanan spa berkualitas tinggi", "price": "200.000"},
+    #         {"name": "Game Center", "description": "Pusat hiburan dengan berbagai permainan seru", "price": "150.000"},
+    #         {"name": "Bioskop", "description": "Nikmati film favorit dengan layar besar", "price": "200.000"},
+    #         {"name": "Kolam Renang", "description": "Kolam renang outdoor dengan pemandangan indah", "price": "100.000"},
+    #         {"name": "Gym", "description": "Fasilitas gym lengkap untuk menjaga kebugaran Anda", "price": "75.000"},
+    #     ]
+    #     self.facilities.extend(initial_data)
+    #     self.update_table()
 
     def go_back(self):
         QtWidgets.QApplication.quit()

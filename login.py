@@ -1,14 +1,19 @@
 # -*- coding: utf-8 -*-
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtWidgets import QFileDialog, QMainWindow
+from dash import Ui_MainWindow as DashWindow
+from pet import Ui_MainWindow as PetWindow
 
+class LoginWindow(QMainWindow):  # LoginWindow mewarisi QMainWindow
+    def __init__(self):
+        super().__init__()  # Inisialisasi QMainWindow
+        self.setupUi()
 
-class LoginWindow(QMainWindow):
-    def setupUi(self, MainWindow):
-        MainWindow.setObjectName("MainWindow")
-        MainWindow.resize(800, 600)
+    def setupUi(self):
+        self.setObjectName("MainWindow")
+        self.resize(800, 600)
         
-        self.centralwidget = QtWidgets.QWidget(MainWindow)
+        self.centralwidget = QtWidgets.QWidget(self)
         self.centralwidget.setObjectName("centralwidget")
         
         # Label untuk menampilkan latar belakang
@@ -120,26 +125,9 @@ class LoginWindow(QMainWindow):
         """)
         self.change_bg_button.clicked.connect(self.change_background)
         
-        MainWindow.setCentralWidget(self.centralwidget)
-
-        # Menubar dan statusbar
-        self.menubar = QtWidgets.QMenuBar(MainWindow)
-        self.menubar.setGeometry(QtCore.QRect(0, 0, 800, 21))
-        self.menubar.setObjectName("menubar")
-        MainWindow.setMenuBar(self.menubar)
-        self.statusbar = QtWidgets.QStatusBar(MainWindow)
-        self.statusbar.setObjectName("statusbar")
-        MainWindow.setStatusBar(self.statusbar)
-
-        self.retranslateUi(MainWindow)
-        QtCore.QMetaObject.connectSlotsByName(MainWindow)
-
-    def retranslateUi(self, MainWindow):
-        _translate = QtCore.QCoreApplication.translate
-        MainWindow.setWindowTitle(_translate("MainWindow", "Login"))
+        self.setCentralWidget(self.centralwidget)
 
     def handle_login(self):
-
         users = {"petugas": {"password": "123", "role": "Petugas"}, 
                 "admin": {"password": "123", "role": "Admin"}}
         
@@ -148,12 +136,33 @@ class LoginWindow(QMainWindow):
 
         if username in users and users[username]["password"] == password:
             role = users[username]["role"]
-            QtWidgets.QMessageBox.information(None, "Login", f"Login berhasil sebagai {role}!")
+            QtWidgets.QMessageBox.information(self, "Login", f"Login berhasil sebagai {role}!")
+            if role == "Admin":
+                self.openDash()
+            else:
+                self.openPet()
         else:
-            QtWidgets.QMessageBox.warning(None, "Login", "Username atau password salah!")
+            QtWidgets.QMessageBox.warning(self, "Login", "Username atau password salah!")
+
+    def openDash(self):
+        self.dash_window = QtWidgets.QMainWindow()
+        self.ui = DashWindow()
+        self.ui.setupUi(self.dash_window)
+        self.dash_window.showMaximized()
+        self.close()  # Tutup jendela login utama
+
+    def openPet(self):
+        self.pet_window = QtWidgets.QMainWindow()
+        self.ui = PetWindow()
+        self.ui.setupUi(self.pet_window)
+        self.pet_window.showMaximized()
+        self.close()  # Tutup jendela login utama
 
     def handle_back(self):
-        QtWidgets.QMessageBox.information(None, "Kembali", "Anda menekan tombol Kembali.")
+        from wel import AcumalakaHotelApp
+        self.welcome = AcumalakaHotelApp()
+        self.welcome.show()
+        self.close()
 
     def set_background(self, file_path):
         try:
@@ -163,7 +172,7 @@ class LoginWindow(QMainWindow):
 
     def change_background(self):
         options = QFileDialog.Options()
-        file_path, _ = QFileDialog.getOpenFileName(None, "Pilih Background", "", "Images (*.png *.jpg *.jpeg *.bmp)", options=options)
+        file_path, _ = QFileDialog.getOpenFileName(self, "Pilih Background", "", "Images (*.png *.jpg *.jpeg *.bmp)", options=options)
         if file_path:
             self.set_background(file_path)
 
@@ -171,8 +180,6 @@ class LoginWindow(QMainWindow):
 if __name__ == "__main__":
     import sys
     app = QtWidgets.QApplication(sys.argv)
-    MainWindow = QtWidgets.QMainWindow()
-    ui = LoginWindow()
-    ui.setupUi(MainWindow)
-    MainWindow.show()  # Layar penuh
+    window = LoginWindow()
+    window.show()
     sys.exit(app.exec_())

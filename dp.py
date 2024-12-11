@@ -1,7 +1,13 @@
 # -*- coding: utf-8 -*- 
 from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtWidgets import QMessageBox, QInputDialog
+from databasemanager import DatabaseManager
 
 class Ui_MainWindow(object):
+    def __init__(self):
+        # Initialize database manager
+        self.db_manager = DatabaseManager()
+
     def setupUi(self, MainWindow):
         MainWindow.setObjectName("MainWindow")
         MainWindow.resize(900, 700)
@@ -86,9 +92,9 @@ class Ui_MainWindow(object):
 
         # Table
         self.tableWidget = QtWidgets.QTableWidget(self.centralwidget)
-        self.tableWidget.setColumnCount(6)  # Mengubah jumlah kolom menjadi 6
-        self.tableWidget.setHorizontalHeaderLabels(["ID", "Nama", "Telepon", "No KTP", "Alamat", "Jenis Kelamin"])
-        self.tableWidget.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)  # Disable editing
+        self.tableWidget.setColumnCount(5)  # Changed to match database columns
+        self.tableWidget.setHorizontalHeaderLabels(["ID", "Nama", "Email", "Telepon", "Alamat"])
+        self.tableWidget.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
         self.tableWidget.horizontalHeader().setStretchLastSection(True)
 
         # Set all columns to have the same width
@@ -103,8 +109,14 @@ class Ui_MainWindow(object):
         self.backButton = QtWidgets.QPushButton("Kembali", self.centralwidget)
         self.buttonLayout.addWidget(self.backButton)
 
+        self.addButton = QtWidgets.QPushButton("Tambah", self.centralwidget)
+        self.buttonLayout.addWidget(self.addButton)
+
         self.deleteButton = QtWidgets.QPushButton("Hapus", self.centralwidget)
         self.buttonLayout.addWidget(self.deleteButton)
+
+        self.editButton = QtWidgets.QPushButton("Edit", self.centralwidget)
+        self.buttonLayout.addWidget(self.editButton)
 
         self.verticalLayout.addLayout(self.buttonLayout)
 
@@ -117,34 +129,30 @@ class Ui_MainWindow(object):
 
         # Signal Connections
         self.searchButton.clicked.connect(self.searchData)
-        self.searchInput.returnPressed.connect(self.searchData)  # Trigger search on Enter key
+        self.searchInput.returnPressed.connect(self.searchData)
         self.deleteButton.clicked.connect(self.deleteRow)
-        self.backButton.clicked.connect(MainWindow.close)  # Menutup jendela utama
+        self.addButton.clicked.connect(self.addCustomer)
+        self.editButton.clicked.connect(self.editCustomer)
+        self.backButton.clicked.connect(MainWindow.close)
 
-        # Load sample data
-        self.loadSampleData()
+        # Load data from database
+        self.loadCustomerData()
 
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
         MainWindow.setWindowTitle(_translate("MainWindow", "Data Pelanggan"))
 
-    def loadSampleData(self):
-        """Load sample data into the table."""
-        data = [
-            ("001", "Lisa Blekpink", "081234567890", "1234567890123456", "Jl. Merdeka No. 10, Jakarta", "Perempuan"),
-            ("002", "Hanni New Jeans", "082345678901", "1234567890123457", "Jl. Raya No. 15, Bandung", "Perempuan"),
-            ("003", "Odette ML", "083456789012", "1234567890123458", "Jl. Sukses No. 20, Yogyakarta", "Perempuan"),
-            ("004", "Jihyo Twice", "084567890123", "1234567890123459", "Jl. Sejahtera No. 25, Surabaya", "Perempuan"),
-            ("005", "V BTS", "08376792123", "1234567890123460", "Jl. Pahlawan No. 30, Bali", "Laki-laki"),
-        ]
-        self.tableWidget.setRowCount(len(data))
-        for row, (id_, name, phone, ktp, address, gender) in enumerate(data):
-            self.tableWidget.setItem(row, 0, QtWidgets.QTableWidgetItem(id_))
-            self.tableWidget.setItem(row, 1, QtWidgets.QTableWidgetItem(name))
-            self.tableWidget.setItem(row, 2, QtWidgets.QTableWidgetItem(phone))
-            self.tableWidget.setItem(row, 3, QtWidgets.QTableWidgetItem(ktp))
-            self.tableWidget.setItem(row, 4, QtWidgets.QTableWidgetItem(address))
-            self.tableWidget.setItem(row, 5, QtWidgets.QTableWidgetItem(gender))
+    def loadCustomerData(self):
+        """Load customer data from the database."""
+        customers = self.db_manager.get_customers()
+        self.tableWidget.setRowCount(len(customers))
+        
+        for row, customer in enumerate(customers):
+            self.tableWidget.setItem(row, 0, QtWidgets.QTableWidgetItem(str(customer['id'])))
+            self.tableWidget.setItem(row, 1, QtWidgets.QTableWidgetItem(customer['name']))
+            self.tableWidget.setItem(row, 2, QtWidgets.QTableWidgetItem(customer['email']))
+            self.tableWidget.setItem(row, 3, QtWidgets.QTableWidgetItem(customer['phone']))
+            self.tableWidget.setItem(row, 4, QtWidgets.QTableWidgetItem(customer['address']))
 
     def searchData(self):
         """Search the table based on the input text."""
@@ -159,10 +167,90 @@ class Ui_MainWindow(object):
             self.tableWidget.setRowHidden(row, not match)
 
     def deleteRow(self):
-        """Delete the selected row from the table."""
+        """Delete the selected customer from the database."""
         selected_row = self.tableWidget.currentRow()
         if selected_row != -1:
-            self.tableWidget.removeRow(selected_row)
+            customer_id = self.tableWidget.item(selected_row, 0).text()
+            
+            # Konfirmasi penghapusan
+            reply = QMessageBox.question(None, 'Konfirmasi Hapus', 
+                                         f'Apakah Anda yakin ingin menghapus pelanggan dengan ID {customer_id}?',
+                                         QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+            
+            if reply == QMessageBox.Yes:
+                # Hapus dari database
+                if self.db_manager.delete_customer(int(customer_id)):
+                    self.tableWidget.removeRow(selected_row)
+                    QMessageBox.information(None, 'Berhasil', 'Pelanggan berhasil dihapus.')
+                else:
+                    QMessageBox.warning(None, 'Gagal', 'Gagal menghapus pelanggan.')
+
+    def addCustomer(self):
+        """Add a new customer to the database."""
+        # Dialog untuk mengumpulkan informasi pelanggan
+        name, ok1 = QInputDialog.getText(None, 'Tambah Pelanggan', 'Nama:')
+        if not ok1 or not name:
+            return
+        
+        email, ok2 = QInputDialog.getText(None, 'Tambah Pelanggan', 'Email:')
+        if not ok2:
+            return
+        
+        phone, ok3 = QInputDialog.getText(None, 'Tambah Pelanggan', 'Telepon:')
+        if not ok3:
+            return
+        
+        address, ok4 = QInputDialog.getText(None, 'Tambah Pelanggan', 'Alamat:')
+        if not ok4:
+            return
+
+        # Tambah pelanggan ke database
+        customer_id = self.db_manager.add_customer(name, email, phone, address)
+        
+        if customer_id:
+            # Reload data setelah menambahkan pelanggan
+            QMessageBox.information(None, 'Berhasil', 'Pelanggan berhasil ditambahkan.')
+            self.loadCustomerData()
+        else:
+            QMessageBox.warning(None, 'Gagal', 'Gagal menambahkan pelanggan.')
+
+    def editCustomer(self):
+        """Edit an existing customer in the database."""
+        selected_row = self.tableWidget.currentRow()
+        if selected_row == -1:
+            QMessageBox.warning(None, 'Peringatan', 'Pilih pelanggan yang ingin diedit.')
+            return
+
+        # Ambil informasi pelanggan yang dipilih
+        customer_id = self.tableWidget.item(selected_row, 0).text()
+        current_name = self.tableWidget.item(selected_row, 1).text()
+        current_email = self.tableWidget.item(selected_row, 2).text()
+        current_phone = self.tableWidget.item(selected_row, 3).text()
+        current_address = self.tableWidget.item(selected_row, 4).text()
+
+        # Dialog untuk edit informasi pelanggan
+        name, ok1 = QInputDialog.getText(None, 'Edit Pelanggan', 'Nama:', text=current_name)
+        if not ok1 or not name:
+            return
+        
+        email, ok2 = QInputDialog.getText(None, 'Edit Pelanggan', 'Email:', text=current_email)
+        if not ok2:
+            return
+        
+        phone, ok3 = QInputDialog.getText(None, 'Edit Pelanggan', 'Telepon:', text=current_phone)
+        if not ok3:
+            return
+        
+        address, ok4 = QInputDialog.getText(None, 'Edit Pelanggan', 'Alamat:', text=current_address)
+        if not ok4:
+            return
+
+        # Update pelanggan di database
+        if self.db_manager.update_customer(int(customer_id), name, email, phone, address):
+            QMessageBox.information(None, 'Berhasil', 'Pelanggan berhasil diperbarui.')
+            self.loadCustomerData()
+        else:
+            QMessageBox.warning(None, 'Gagal', 'Gagal memperbarui pelanggan.')
 
 if __name__ == "__main__":
     import sys

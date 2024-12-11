@@ -7,7 +7,6 @@ from logout import Ui_MainWindow as LogoutWindow
 class AdminProfileWindow(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
-
         # Set up the admin profile window
         self.setWindowTitle("Admin Profile - Nata")
         self.setFixedSize(400, 300)
@@ -171,21 +170,56 @@ class Ui_MainWindow(object):
         self.profile_window = AdminProfileWindow()
         self.profile_window.show()
 
+    # def show_rooms(self):
+    #     room_details = {
+    #         "Deluxe Room": "Harga: Rp 1.200.000/malam\nFasilitas: TV, Wi-Fi, AC, Kamar Mandi",
+    #         "Suite Room": "Harga: Rp 2.000.000/malam\nFasilitas: TV, Wi-Fi, AC, Balkon, Kamar Mandi",
+    #         "Presidential Room": "Harga: Rp 10.000.000/malam\nFasilitas: TV, Wi-Fi, AC, Kolam Renang Pribadi",
+    #     }
+    #     selected = self.comboBox.currentText()
+    #     if selected in room_details:
+    #         QtWidgets.QMessageBox.information(
+    #             None, f"Detail {selected}", room_details[selected]
+    #         )
+
     def show_rooms(self):
-        room_details = {
-            "Deluxe Room": "Harga: Rp 1.200.000/malam\nFasilitas: TV, Wi-Fi, AC, Kamar Mandi",
-            "Suite Room": "Harga: Rp 2.000.000/malam\nFasilitas: TV, Wi-Fi, AC, Balkon, Kamar Mandi",
-            "Presidential Room": "Harga: Rp 10.000.000/malam\nFasilitas: TV, Wi-Fi, AC, Kolam Renang Pribadi",
-        }
-        selected = self.comboBox.currentText()
-        if selected in room_details:
-            QtWidgets.QMessageBox.information(
-                None, f"Detail {selected}", room_details[selected]
-            )
+        try:
+            from databasemanager import DatabaseManager
+            db_manager = DatabaseManager()
+
+            # Ambil tipe kamar yang dipilih dari comboBox
+            selected_type = self.comboBox.currentText()
+
+            # Query untuk mengambil kamar berdasarkan tipe
+            query = """
+                SELECT r.room_number, rt.type_name, rt.price, r.status, rt.description
+                FROM rooms r
+                JOIN room_types rt ON r.room_type_id = rt.id
+                WHERE rt.type_name = %s
+            """
+            
+            # Menjalankan query untuk mendapatkan kamar berdasarkan tipe
+            rooms = db_manager.cursor.execute(query, (selected_type,))
+            
+            if rooms:
+                # Menampilkan detail kamar
+                room_details = "\n\n".join(
+                    [f"Kamar: {room['room_number']}\nHarga: Rp {room['price']:.0f}\nStatus: {room['status']}\nDeskripsi: {room['description'] or 'Tidak ada deskripsi'}"
+                    for room in rooms]
+                )
+                QtWidgets.QMessageBox.information(None, f"Detail Kamar {selected_type}", room_details)
+            else:
+                QtWidgets.QMessageBox.information(None, "Informasi", "Tidak ada kamar untuk tipe ini.")
+
+            # Tutup koneksi database
+            db_manager.close()
+
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(None, "Error", f"Gagal mengambil detail kamar: {str(e)}")
 
     def open_menu_window(self, MainWindow):
         self.window = QtWidgets.QMainWindow()
-        self.ui = MenuWindow()
+        self.ui = MenuWindow(self)
         self.ui.setupUi(self.window)
         MainWindow.close()
         self.window.showMaximized()

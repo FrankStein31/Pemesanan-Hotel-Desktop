@@ -1,19 +1,25 @@
+import sys
+import mysql.connector
 from PyQt5 import QtCore, QtGui, QtWidgets
+from databasemanager import DatabaseManager
 
 class Ui_MainWindow(object):
+    def __init__(self):
+        self.db_manager = DatabaseManager()
+
     def setupUi(self, MainWindow):
         MainWindow.setObjectName("MainWindow")
-        MainWindow.resize(1000, 700)  # Ukuran jendela lebih besar
+        MainWindow.resize(1000, 700)
         self.centralwidget = QtWidgets.QWidget(MainWindow)
         self.centralwidget.setObjectName("centralwidget")
 
-        # Layout utama untuk widget pusat
+        # Main layout
         self.main_layout = QtWidgets.QVBoxLayout(self.centralwidget)
 
-        # Menambahkan label di atas tabel dengan tulisan "Tipe Kamar di Hotel Acumalaka"
+        # Title Label
         self.title_label = QtWidgets.QLabel(self.centralwidget)
         self.title_label.setText("Tipe Kamar di Hotel Acumalaka")
-        self.title_label.setAlignment(QtCore.Qt.AlignCenter)  # Agar tulisan berada di tengah
+        self.title_label.setAlignment(QtCore.Qt.AlignCenter)
         self.title_label.setFont(QtGui.QFont("Comic Sans MS", 24, QtGui.QFont.Bold))
         self.title_label.setStyleSheet("""
             color: #3f6ad8;
@@ -21,9 +27,8 @@ class Ui_MainWindow(object):
         """)
         self.main_layout.addWidget(self.title_label)
 
-        # Menambahkan search bar
+        # Search Layout
         self.search_layout = QtWidgets.QHBoxLayout()
-
         self.search_input = QtWidgets.QLineEdit(self.centralwidget)
         self.search_input.setPlaceholderText("Cari Tipe Kamar...")
         self.search_input.setFont(QtGui.QFont("Arial", 14))
@@ -41,29 +46,22 @@ class Ui_MainWindow(object):
         """)
         self.search_input.textChanged.connect(self.search_rooms)
         self.search_layout.addWidget(self.search_input)
-
         self.main_layout.addLayout(self.search_layout)
 
-        # Tabel untuk menampilkan data kamar tanpa kolom Aksi
+        # Table Widget
         self.tableWidget = QtWidgets.QTableWidget(self.centralwidget)
-        self.tableWidget.setColumnCount(3)  # Mengurangi kolom Aksi
-        self.tableWidget.setHorizontalHeaderLabels(["Tipe Kamar", "Harga", "Deskripsi"])
+        self.tableWidget.setColumnCount(4)  # Added ID column
+        self.tableWidget.setHorizontalHeaderLabels(["ID", "Tipe Kamar", "Harga", "Deskripsi"])
+        
+        # Hide ID column
+        self.tableWidget.setColumnHidden(0, True)
 
-        # Styling untuk header
+        # Styling for table
         header = self.tableWidget.horizontalHeader()
-        header.setSectionResizeMode(0, QtWidgets.QHeaderView.Stretch)  # Kolom Tipe Kamar
-        header.setSectionResizeMode(1, QtWidgets.QHeaderView.ResizeToContents)  # Kolom Harga
-        header.setSectionResizeMode(2, QtWidgets.QHeaderView.Stretch)  # Kolom Deskripsi
+        header.setSectionResizeMode(1, QtWidgets.QHeaderView.Stretch)  # Room Type
+        header.setSectionResizeMode(2, QtWidgets.QHeaderView.ResizeToContents)  # Price
+        header.setSectionResizeMode(3, QtWidgets.QHeaderView.Stretch)  # Description
 
-        self.tableWidget.setMinimumHeight(400)  # Set ukuran minimal untuk tinggi tabel
-        self.tableWidget.setMinimumWidth(900)  # Set ukuran minimal untuk lebar tabel
-
-        # Menambahkan desain tabel
-        self.tableWidget.setEditTriggers(QtWidgets.QAbstractItemView.DoubleClicked)  # Mengizinkan edit saat klik ganda
-        self.tableWidget.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)  # Memilih seluruh baris
-        self.tableWidget.setAlternatingRowColors(True)  # Baris bergantian warna untuk kenyamanan baca
-
-        # Styling untuk tabel
         self.tableWidget.setStyleSheet(""" 
             QTableWidget {
                 border: 2px solid #ddd;
@@ -72,42 +70,30 @@ class Ui_MainWindow(object):
                 color: #333;
                 font-family: "Arial";
             }
-            QTableWidget::item {
-                padding: 12px;
-            }
-            QHeaderView::section {
-                background-color: #3f6ad8;
-                color: white;
-                font-weight: bold;
-                font-size: 18px;
-                padding: 10px;
-                text-align: center;
-            }
-            QTableWidget::horizontalHeader {
-                border: 2px solid #ddd;
-            }
-            QTableWidget::item:hover {
-                background-color: #e9e9e9;
-            }
         """)
 
         self.main_layout.addWidget(self.tableWidget)
 
-        # Mengisi tabel dengan data awal
-        self.populate_table()
-
-        # Layout form untuk input data
+        # Form Layout for Input
         self.form_layout = QtWidgets.QFormLayout()
+        
+        # ID input (hidden)
+        self.room_id_input = QtWidgets.QLineEdit(self.centralwidget)
+        self.room_id_input.setVisible(False)
+        
+        # Room Type input
         self.room_name_input = QtWidgets.QLineEdit(self.centralwidget)
-        self.room_name_input.setPlaceholderText("Masukkan nama kamar")
+        self.room_name_input.setPlaceholderText("Masukkan nama tipe kamar")
         self.room_name_input.setFont(QtGui.QFont("Arial", 14))
-        self.form_layout.addRow("Nama Kamar:", self.room_name_input)
+        self.form_layout.addRow("Nama Tipe Kamar:", self.room_name_input)
 
+        # Price input
         self.room_price_input = QtWidgets.QLineEdit(self.centralwidget)
         self.room_price_input.setPlaceholderText("Masukkan harga kamar")
         self.room_price_input.setFont(QtGui.QFont("Arial", 14))
         self.form_layout.addRow("Harga:", self.room_price_input)
 
+        # Description input
         self.room_desc_input = QtWidgets.QLineEdit(self.centralwidget)
         self.room_desc_input.setPlaceholderText("Masukkan deskripsi kamar")
         self.room_desc_input.setFont(QtGui.QFont("Arial", 14))
@@ -115,133 +101,75 @@ class Ui_MainWindow(object):
 
         self.main_layout.addLayout(self.form_layout)
 
-        # Layout untuk tombol
+        # Button Layout
         self.button_layout = QtWidgets.QHBoxLayout()
 
-        self.add_button = QtWidgets.QPushButton("Tambah Kamar", self.centralwidget)
-        self.add_button.setStyleSheet(""" 
-            QPushButton {
-                background-color: #28a745;
-                color: white;
-                border-radius: 8px;
-                padding: 12px 24px;
-                font-weight: bold;
-                font-size: 16px;
-            }
-            QPushButton:hover {
-                background-color: #218838;
-            }
-        """)
-        self.add_button.clicked.connect(self.add_room)
-        self.button_layout.addWidget(self.add_button)
+        # Buttons with consistent styling and connected methods
+        buttons = [
+            ("Tambah Kamar", self.add_room, "#28a745"),
+            ("Perbarui Kamar", self.update_room, "#ffc107"),
+            ("Hapus Kamar", self.delete_room, "#dc3545"),
+            ("Kosongkan Form", self.clear_fields, "#6c757d"),
+            ("Kembali", self.back_action, "#007bff")
+        ]
 
-        self.update_button = QtWidgets.QPushButton("Perbarui Kamar", self.centralwidget)
-        self.update_button.setStyleSheet(""" 
-            QPushButton {
-                background-color: #ffc107;
-                color: white;
-                border-radius: 8px;
-                padding: 12px 24px;
-                font-weight: bold;
-                font-size: 16px;
-            }
-            QPushButton:hover {
-                background-color: #e0a800;
-            }
-        """)
-        self.update_button.clicked.connect(self.update_room)
-        self.button_layout.addWidget(self.update_button)
-
-        self.delete_button = QtWidgets.QPushButton("Hapus Kamar", self.centralwidget)
-        self.delete_button.setStyleSheet(""" 
-            QPushButton {
-                background-color: #dc3545;
-                color: white;
-                border-radius: 8px;
-                padding: 12px 24px;
-                font-weight: bold;
-                font-size: 16px;
-            }
-            QPushButton:hover {
-                background-color: #c82333;
-            }
-        """)
-        self.delete_button.clicked.connect(self.delete_room)
-        self.button_layout.addWidget(self.delete_button)
-
-        self.clear_button = QtWidgets.QPushButton("Kosongkan Form", self.centralwidget)
-        self.clear_button.setStyleSheet(""" 
-            QPushButton {
-                background-color: #6c757d;
-                color: white;
-                border-radius: 8px;
-                padding: 12px 24px;
-                font-weight: bold;
-                font-size: 16px;
-            }
-            QPushButton:hover {
-                background-color: #5a6268;
-            }
-        """)
-        self.clear_button.clicked.connect(self.clear_fields)
-        self.button_layout.addWidget(self.clear_button)
-
-        # Tombol Kembali
-        self.back_button = QtWidgets.QPushButton("Kembali", self.centralwidget)
-        self.back_button.setStyleSheet(""" 
-            QPushButton {
-                background-color: #007bff;
-                color: white;
-                border-radius: 8px;
-                padding: 12px 24px;
-                font-weight: bold;
-                font-size: 16px;
-            }
-            QPushButton:hover {
-                background-color: #0069d9;
-            }
-        """)
-        self.back_button.clicked.connect(self.back_action)
-        self.button_layout.addWidget(self.back_button)
+        for label, method, color in buttons:
+            btn = QtWidgets.QPushButton(label, self.centralwidget)
+            btn.setStyleSheet(f""" 
+                QPushButton {{
+                    background-color: {color};
+                    color: white;
+                    border-radius: 8px;
+                    padding: 12px 24px;
+                    font-weight: bold;
+                    font-size: 16px;
+                }}
+                QPushButton:hover {{
+                    background-color: {color}CC;
+                }}
+            """)
+            btn.clicked.connect(method)
+            self.button_layout.addWidget(btn)
 
         self.main_layout.addLayout(self.button_layout)
 
         MainWindow.setCentralWidget(self.centralwidget)
-        self.retranslateUi(MainWindow)
-        QtCore.QMetaObject.connectSlotsByName(MainWindow)
 
-    def retranslateUi(self, MainWindow):
-        _translate = QtCore.QCoreApplication.translate
-        MainWindow.setWindowTitle(_translate("MainWindow", "Tipe Kamar Hotel"))
+        # Populate table on startup
+        self.populate_table()
+
+        # Connect table row selection to fill form
+        self.tableWidget.itemSelectionChanged.connect(self.fill_form_from_selection)
 
     def populate_table(self):
-        # Menambahkan 5 data awal ke dalam tabel
-        self.sample_data = [
-            ("Standard Room", "Rp 500.000", "Kamar nyaman dengan fasilitas modern."),
-            ("Executive Room", "Rp 1.500.000", "Kamar dasar untuk satu orang."),
-            ("Deluxe Room", "Rp 2.500.000", "Suite mewah dengan kolam renang pribadi dan teras."),
-            ("Suite Room", "Rp 3.000.000", "Kamar luas dengan tempat tidur king-size dan pemandangan laut."),
-            ("Presidential Room", "Rp 5.000.000", "Kamar terjangkau dengan fasilitas dasar.")
-        ]
+        # Clear existing rows
+        self.tableWidget.setRowCount(0)
 
-        # Memasukkan data awal ke dalam tabel
-        for data in self.sample_data:
+        # Fetch room types from database
+        room_types = self.db_manager.get_room_types()
+        
+        for room_type in room_types:
             row_position = self.tableWidget.rowCount()
             self.tableWidget.insertRow(row_position)
-            self.tableWidget.setItem(row_position, 0, QtWidgets.QTableWidgetItem(data[0]))
-            self.tableWidget.setItem(row_position, 1, QtWidgets.QTableWidgetItem(data[1]))
-            self.tableWidget.setItem(row_position, 2, QtWidgets.QTableWidgetItem(data[2]))
+            
+            # Insert data in order: ID, Type Name, Price, Description
+            self.tableWidget.setItem(row_position, 0, QtWidgets.QTableWidgetItem(str(room_type['id'])))
+            self.tableWidget.setItem(row_position, 1, QtWidgets.QTableWidgetItem(room_type['type_name']))
+            self.tableWidget.setItem(row_position, 2, QtWidgets.QTableWidgetItem(f"Rp {room_type['price']:,.0f}"))
+            self.tableWidget.setItem(row_position, 3, QtWidgets.QTableWidgetItem(room_type['description']))
 
-    def search_rooms(self):
-        search_text = self.search_input.text().lower()
-        self.tableWidget.setRowCount(0)  # Reset tabel
-        for data in self.sample_data:
-            if search_text in data[0].lower() or search_text in data[1].lower() or search_text in data[2].lower():
-                row_position = self.tableWidget.rowCount()
-                self.tableWidget.insertRow(row_position)
-                self.tableWidget.setItem(row_position, 0, QtWidgets.QTableWidgetItem(data[0]))
-                self.tableWidget.setItem(row_position, 1, QtWidgets.QTableWidgetItem(data[1]))
-                self.tableWidget.setItem(row_position, 2, QtWidgets.QTableWidgetItem(data[2]))
+    def fill_form_from_selection(self):
+        selected_rows = self.tableWidget.selectionModel().selectedRows()
+        if selected_rows:
+            row = selected_rows[0].row()
+            self.room_id_input.setText(self.tableWidget.item(row, 0).text())
+            self.room_name_input.setText(self.tableWidget.item(row, 1).text())
+            
+            # Remove 'Rp' and thousand separators before setting price
+            price_text = self.tableWidget.item(row, 2).text().replace('Rp ', '').replace(',', '')
+            self.room_price_input.setText(price_text)
+            
+            self.room_desc_input.setText(self.tableWidget.item(row, 3).text())
 
     def add_room(self):
         room_name = self.room_name_input.text()
@@ -249,63 +177,104 @@ class Ui_MainWindow(object):
         room_desc = self.room_desc_input.text()
 
         if room_name and room_price and room_desc:
-            row_position = self.tableWidget.rowCount()
-            self.tableWidget.insertRow(row_position)
-            self.tableWidget.setItem(row_position, 0, QtWidgets.QTableWidgetItem(room_name))
-            self.tableWidget.setItem(row_position, 1, QtWidgets.QTableWidgetItem(room_price))
-            self.tableWidget.setItem(row_position, 2, QtWidgets.QTableWidgetItem(room_desc))
-
-            self.clear_fields()
-            self.sample_data.append((room_name, room_price, room_desc))
+            try:
+                # Convert price to numeric
+                price = float(room_price.replace(',', ''))
+                
+                # Add to database
+                new_id = self.db_manager.add_room_type(room_name, room_desc, price)
+                
+                if new_id:
+                    # Refresh table
+                    self.populate_table()
+                    self.clear_fields()
+                    QtWidgets.QMessageBox.information(None, "Sukses", "Tipe Kamar Berhasil Ditambahkan!")
+            except ValueError:
+                QtWidgets.QMessageBox.warning(None, "Error", "Harga harus berupa angka!")
         else:
-            self.show_error("Harap isi semua kolom.")
+            QtWidgets.QMessageBox.warning(None, "Error", "Harap isi semua kolom!")
 
     def update_room(self):
-        selected_row = self.tableWidget.currentRow()
-        if selected_row != -1:
-            room_name = self.room_name_input.text()
-            room_price = self.room_price_input.text()
-            room_desc = self.room_desc_input.text()
+        room_id = self.room_id_input.text()
+        room_name = self.room_name_input.text()
+        room_price = self.room_price_input.text()
+        room_desc = self.room_desc_input.text()
 
-            if room_name and room_price and room_desc:
-                self.tableWidget.setItem(selected_row, 0, QtWidgets.QTableWidgetItem(room_name))
-                self.tableWidget.setItem(selected_row, 1, QtWidgets.QTableWidgetItem(room_price))
-                self.tableWidget.setItem(selected_row, 2, QtWidgets.QTableWidgetItem(room_desc))
-
-                self.clear_fields()
-                self.sample_data[selected_row] = (room_name, room_price, room_desc)
-            else:
-                self.show_error("Harap isi semua kolom.")
+        if room_id and room_name and room_price and room_desc:
+            try:
+                # Convert price to numeric
+                price = float(room_price.replace(',', ''))
+                
+                # Update in database
+                success = self.db_manager.update_room_type(int(room_id), room_name, room_desc, price)
+                
+                if success:
+                    # Refresh table
+                    self.populate_table()
+                    self.clear_fields()
+                    QtWidgets.QMessageBox.information(None, "Sukses", "Tipe Kamar Berhasil Diperbarui!")
+            except ValueError:
+                QtWidgets.QMessageBox.warning(None, "Error", "Harga harus berupa angka!")
         else:
-            self.show_error("Pilih kamar yang akan diperbarui.")
+            QtWidgets.QMessageBox.warning(None, "Error", "Harap pilih kamar dan isi semua kolom!")
 
     def delete_room(self):
-        selected_row = self.tableWidget.currentRow()
-        if selected_row != -1:
-            self.tableWidget.removeRow(selected_row)
-            del self.sample_data[selected_row]
+        room_id = self.room_id_input.text()
+
+        if room_id:
+            confirm = QtWidgets.QMessageBox.question(
+                None, 
+                "Konfirmasi Hapus", 
+                "Apakah Anda yakin ingin menghapus tipe kamar ini?",
+                QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No
+            )
+
+            if confirm == QtWidgets.QMessageBox.Yes:
+                # Delete from database
+                success = self.db_manager.delete_room_type(int(room_id))
+                
+                if success:
+                    # Refresh table
+                    self.populate_table()
+                    self.clear_fields()
+                    QtWidgets.QMessageBox.information(None, "Sukses", "Tipe Kamar Berhasil Dihapus!")
         else:
-            self.show_error("Pilih kamar yang akan dihapus.")
+            QtWidgets.QMessageBox.warning(None, "Error", "Harap pilih kamar yang akan dihapus!")
+
+    def search_rooms(self):
+        search_text = self.search_input.text().lower()
+        
+        # Loop through all rows
+        for row in range(self.tableWidget.rowCount()):
+            # Ambil teks dari setiap kolom
+            type_name = self.tableWidget.item(row, 1).text().lower() if self.tableWidget.item(row, 1) else ""
+            price = self.tableWidget.item(row, 2).text().lower() if self.tableWidget.item(row, 2) else ""
+            description = self.tableWidget.item(row, 3).text().lower() if self.tableWidget.item(row, 3) else ""
+            
+            # Tentukan apakah baris harus disembunyikan
+            if (search_text in type_name or 
+                search_text in price or 
+                search_text in description):
+                self.tableWidget.setRowHidden(row, False)  # Tampilkan baris
+            else:
+                self.tableWidget.setRowHidden(row, True)  # Sembunyikan baris
 
     def clear_fields(self):
+        self.room_id_input.clear()
         self.room_name_input.clear()
         self.room_price_input.clear()
         self.room_desc_input.clear()
 
-    def show_error(self, message):
-        error_dialog = QtWidgets.QErrorMessage()
-        error_dialog.showMessage(message)
-        error_dialog.exec_()
-
     def back_action(self):
-        # Menutup aplikasi atau melakukan aksi lain
         QtWidgets.QApplication.quit()
 
-if __name__ == "__main__":
-    import sys
+def main():
     app = QtWidgets.QApplication(sys.argv)
     MainWindow = QtWidgets.QMainWindow()
     ui = Ui_MainWindow()
     ui.setupUi(MainWindow)
     MainWindow.showMaximized()
     sys.exit(app.exec_())
+
+if __name__ == "__main__":
+    main()
