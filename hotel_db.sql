@@ -70,14 +70,17 @@ CREATE TABLE `payments` (
   PRIMARY KEY (`id`),
   KEY `reservation_id` (`reservation_id`),
   CONSTRAINT `payments_ibfk_1` FOREIGN KEY (`reservation_id`) REFERENCES `reservations` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=32 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=35 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 /*Data for the table `payments` */
 
 insert  into `payments`(`id`,`reservation_id`,`payment_date`,`amount`,`payment_method`,`created_at`,`updated_at`) values 
 (8,2,'2024-12-11',200000000,'Cash','2024-12-11 18:50:29','2024-12-11 18:50:29'),
 (30,3,'2024-12-11',3000000,'Cash','2024-12-11 20:19:58','2024-12-11 20:19:58'),
-(31,4,'2024-12-11',900000,'Cash','2024-12-11 20:48:49','2024-12-11 20:48:49');
+(31,4,'2024-12-11',900000,'Cash','2024-12-11 20:48:49','2024-12-11 20:48:49'),
+(32,5,'2024-12-11',4000000,'Cash','2024-12-11 20:55:58','2024-12-11 20:55:58'),
+(33,6,'2024-12-11',8000000,'Cash','2024-12-11 21:10:14','2024-12-11 21:10:14'),
+(34,7,'2024-12-11',2500123,'Cash','2024-12-11 21:16:33','2024-12-11 21:16:33');
 
 /*Table structure for table `reservation_facilities` */
 
@@ -92,14 +95,17 @@ CREATE TABLE `reservation_facilities` (
   KEY `facility_id` (`facility_id`),
   CONSTRAINT `reservation_facilities_ibfk_1` FOREIGN KEY (`reservation_id`) REFERENCES `reservations` (`id`),
   CONSTRAINT `reservation_facilities_ibfk_2` FOREIGN KEY (`facility_id`) REFERENCES `facilities` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 /*Data for the table `reservation_facilities` */
 
 insert  into `reservation_facilities`(`id`,`reservation_id`,`facility_id`) values 
 (2,2,1),
 (3,3,1),
-(4,4,6);
+(4,4,6),
+(5,5,1),
+(6,6,1),
+(7,7,4);
 
 /*Table structure for table `reservation_rooms` */
 
@@ -114,7 +120,7 @@ CREATE TABLE `reservation_rooms` (
   KEY `room_id` (`room_id`),
   CONSTRAINT `reservation_rooms_ibfk_1` FOREIGN KEY (`reservation_id`) REFERENCES `reservations` (`id`),
   CONSTRAINT `reservation_rooms_ibfk_2` FOREIGN KEY (`room_id`) REFERENCES `rooms` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 /*Data for the table `reservation_rooms` */
 
@@ -122,7 +128,11 @@ insert  into `reservation_rooms`(`id`,`reservation_id`,`room_id`) values
 (1,2,1),
 (2,2,2),
 (3,3,4),
-(4,4,1);
+(4,4,1),
+(5,5,1),
+(6,6,1),
+(7,6,2),
+(8,7,3);
 
 /*Table structure for table `reservations` */
 
@@ -140,14 +150,17 @@ CREATE TABLE `reservations` (
   PRIMARY KEY (`id`),
   KEY `customer_id` (`customer_id`),
   CONSTRAINT `reservations_ibfk_1` FOREIGN KEY (`customer_id`) REFERENCES `customers` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 /*Data for the table `reservations` */
 
 insert  into `reservations`(`id`,`customer_id`,`check_in_date`,`check_out_date`,`total_people`,`total_price`,`status`,`created_at`) values 
 (2,1,'2024-12-11','2024-12-13',1,2000000,'Confirmed','2024-12-11 19:58:51'),
 (3,6,'2024-12-11','2024-12-11',1,3000000,'Confirmed','2024-12-11 20:19:58'),
-(4,6,'2024-12-11','2024-12-11',1,900000,'Confirmed','2024-12-11 20:48:49');
+(4,6,'2024-12-11','2024-12-11',1,900000,'Confirmed','2024-12-11 20:48:49'),
+(5,1,'2024-12-11','2024-12-15',2,4000000,'Confirmed','2024-12-11 20:55:58'),
+(6,1,'2024-12-11','2024-12-13',4,8000000,'Confirmed','2024-12-11 21:10:14'),
+(7,6,'2024-12-11','2024-12-11',1,2500123,'Confirmed','2024-12-11 21:16:33');
 
 /*Table structure for table `room_types` */
 
@@ -190,9 +203,9 @@ CREATE TABLE `rooms` (
 /*Data for the table `rooms` */
 
 insert  into `rooms`(`id`,`room_number`,`room_type_id`,`status`) values 
-(1,'101',1,'Tersedia'),
-(2,'102',1,'Tersedia'),
-(3,'103',3,'Tersedia'),
+(1,'101',1,'Terisi'),
+(2,'102',1,'Terisi'),
+(3,'103',3,'Terisi'),
 (4,'104',4,'Tersedia'),
 (5,'105',5,'Tersedia'),
 (6,'106',3,'Tersedia'),

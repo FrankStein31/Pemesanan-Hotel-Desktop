@@ -9,7 +9,7 @@ class Ui_MainWindow(object):
 
     def setupUi(self, MainWindow):
         MainWindow.setObjectName("MainWindow")
-        MainWindow.resize(800, 600)
+        MainWindow.resize(1000, 700)  # Increased width for more columns
         self.centralwidget = QtWidgets.QWidget(MainWindow)
         self.centralwidget.setObjectName("centralwidget")
 
@@ -20,7 +20,7 @@ class Ui_MainWindow(object):
 
         # Search Bar
         self.search_bar = QtWidgets.QLineEdit(self.centralwidget)
-        self.search_bar.setPlaceholderText("Cari berdasarkan Nama atau Jenis Kamar")
+        self.search_bar.setPlaceholderText("Cari berdasarkan Nama, Jenis Kamar, atau Metode Pembayaran")
         self.search_bar.setStyleSheet("""
             QLineEdit {
                 font-size: 16px;
@@ -55,9 +55,28 @@ class Ui_MainWindow(object):
         # Table Widget
         self.tableWidget = QtWidgets.QTableWidget(self.centralwidget)
         self.tableWidget.setRowCount(0)
-        self.tableWidget.setColumnCount(4)
-        self.tableWidget.setHorizontalHeaderLabels(["Tanggal Pemesanan", "Nama", "Jenis Kamar", "Total"])
-        # self.tableWidget.setHorizontalHeaderLabels(["Tanggal Pemesanan", "Nama", "Jenis Kamar", "Total", "Status"])
+        # self.tableWidget.setColumnCount(8)  # Increased column count
+        # self.tableWidget.setHorizontalHeaderLabels([
+        #     "Tanggal Pemesanan", 
+        #     "Nama", 
+        #     "Check-in", 
+        #     "Check-out", 
+        #     "Jenis Kamar", 
+        #     "Nomor Kamar", 
+        #     "Metode Pembayaran", 
+        #     "Total"
+        # ])
+        self.tableWidget.setColumnCount(8)  
+        self.tableWidget.setHorizontalHeaderLabels([
+            "Tanggal Pemesanan", 
+            "Nama", 
+            "Check-in", 
+            "Check-out", 
+            "Jenis Kamar", 
+            "Nomor Kamar", 
+            "Status", 
+            "Total"
+        ])
         self.tableWidget.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
         self.tableWidget.verticalHeader().setVisible(False)
         self.tableWidget.setEditTriggers(QtWidgets.QTableWidget.NoEditTriggers)
@@ -67,7 +86,7 @@ class Ui_MainWindow(object):
             QTableWidget {
                 background-color: #ecf0f1;
                 border: 1px solid #34495e;
-                font-size: 16px;
+                font-size: 14px;
                 font-family: 'Segoe UI', sans-serif;
                 border-radius: 15px;
                 padding: 15px;
@@ -75,8 +94,8 @@ class Ui_MainWindow(object):
             QHeaderView::section {
                 background-color: #2c3e50;
                 color: #ffffff;
-                padding: 18px;
-                font-size: 16px;
+                padding: 12px;
+                font-size: 14px;
                 border: none;
             }
             QTableWidget::item:selected {
@@ -149,34 +168,31 @@ class Ui_MainWindow(object):
         self.window.showMaximized()
 
     def load_reservation_history(self):
-        """Mengambil data riwayat reservasi dari database."""
+        """Mengambil data riwayat reservasi dari database dengan detail lengkap."""
         try:
-            # Sederhanakan query
             query = """
             SELECT 
-                created_at AS tanggal_pemesanan, 
-                (SELECT name FROM customers WHERE id = customer_id) AS nama, 
-                (SELECT type_name FROM room_types 
-                JOIN rooms ON rooms.room_type_id = room_types.id 
-                JOIN reservation_rooms ON reservation_rooms.room_id = rooms.id 
-                WHERE reservation_rooms.reservation_id = reservations.id 
-                LIMIT 1) AS jenis_kamar, 
-                total_price AS total
+                reservations.created_at AS tanggal_pemesanan, 
+                customers.name AS nama, 
+                reservations.check_in_date AS check_in,
+                reservations.check_out_date AS check_out,
+                room_types.type_name AS jenis_kamar, 
+                rooms.room_number AS nomor_kamar,
+                reservations.status AS status_reservasi,
+                reservations.total_price AS total
             FROM 
                 reservations
+            JOIN customers ON reservations.customer_id = customers.id
+            JOIN reservation_rooms ON reservations.id = reservation_rooms.reservation_id
+            JOIN rooms ON reservation_rooms.room_id = rooms.id
+            JOIN room_types ON rooms.room_type_id = room_types.id
             ORDER BY 
-                created_at DESC
+                reservations.created_at DESC
             """
             
-            # Execute query
             self.db_manager.cursor.execute(query)
             results = self.db_manager.cursor.fetchall()
             
-            # Print results for debugging
-            print("Number of reservations:", len(results))
-            for result in results:
-                print(result)
-
             # Clear existing rows
             self.tableWidget.setRowCount(0)
 
@@ -185,18 +201,23 @@ class Ui_MainWindow(object):
                 row_position = self.tableWidget.rowCount()
                 self.tableWidget.insertRow(row_position)
                 
-                # Format date
-                date = row_data['tanggal_pemesanan'].strftime("%d/%m/%Y")
+                # Format dates
+                booking_date = row_data['tanggal_pemesanan'].strftime("%d/%m/%Y")
+                check_in = row_data['check_in'].strftime("%d/%m/%Y")
+                check_out = row_data['check_out'].strftime("%d/%m/%Y")
                 
                 # Format total price
                 total = f"Rp {row_data['total']:,.0f}".replace(',', '.')
 
                 # Set table items
-                self.tableWidget.setItem(row_position, 0, QtWidgets.QTableWidgetItem(str(date)))
+                self.tableWidget.setItem(row_position, 0, QtWidgets.QTableWidgetItem(str(booking_date)))
                 self.tableWidget.setItem(row_position, 1, QtWidgets.QTableWidgetItem(str(row_data['nama'])))
-                self.tableWidget.setItem(row_position, 2, QtWidgets.QTableWidgetItem(str(row_data['jenis_kamar'])))
-                self.tableWidget.setItem(row_position, 3, QtWidgets.QTableWidgetItem(total))
-                # self.tableWidget.setItem(row_position, 4, QtWidgets.QTableWidgetItem(row_data['status']))
+                self.tableWidget.setItem(row_position, 2, QtWidgets.QTableWidgetItem(str(check_in)))
+                self.tableWidget.setItem(row_position, 3, QtWidgets.QTableWidgetItem(str(check_out)))
+                self.tableWidget.setItem(row_position, 4, QtWidgets.QTableWidgetItem(str(row_data['jenis_kamar'])))
+                self.tableWidget.setItem(row_position, 5, QtWidgets.QTableWidgetItem(str(row_data['nomor_kamar'])))
+                self.tableWidget.setItem(row_position, 6, QtWidgets.QTableWidgetItem(str(row_data['status_reservasi'])))
+                self.tableWidget.setItem(row_position, 7, QtWidgets.QTableWidgetItem(total))
 
         except Exception as e:
             QMessageBox.critical(None, "Database Error", f"Error loading reservation history: {str(e)}")
@@ -209,13 +230,12 @@ class Ui_MainWindow(object):
         query = self.search_bar.text().lower()
         
         for row in range(self.tableWidget.rowCount()):
-            # Tentukan apakah baris harus ditampilkan
             show_row = query == "" or any(
                 query in str(self.tableWidget.item(row, col).text()).lower() 
                 for col in range(self.tableWidget.columnCount())
             )
             
-            self.tableWidget.setRowHidden(row, QtCore.QModelIndex(), not show_row)
+            self.tableWidget.setRowHidden(row, not show_row)
 
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate

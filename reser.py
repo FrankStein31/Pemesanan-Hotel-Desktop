@@ -203,7 +203,7 @@ class Ui_MainWindow(object):
         # Add the room layout item to the room layout
         self.room_layout.addWidget(room_layout_item)
 
-    def update_available_rooms(self):
+    def update_available_rooms(self):   
         # Get the currently selected room type and dates
         room_type_combobox, room_quantity_input, room_number_list = self.room_widgets[0]
         room_type_id = room_type_combobox.currentData()
